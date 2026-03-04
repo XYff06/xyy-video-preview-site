@@ -9,7 +9,7 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); }
-.app { max-width: 980px; margin: 0 auto; padding: 22px 16px 40px; }
+.app { width: 90%; margin: 0 auto; padding: 22px 16px 40px; }
 
 .top-categories {
   display: grid;
