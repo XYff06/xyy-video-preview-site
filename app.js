@@ -134,7 +134,7 @@ function renderDetail(app, series) {
   series.episodes.forEach((ep) => {
     const tab = document.createElement("button");
     tab.className = `episode-tab ${state.selectedEpisode === ep.episode ? "active" : ""}`;
-    tab.textContent = `第 ${ep.episode} 集`;
+    tab.textContent = `第${ep.episode}集`;
     tab.onclick = () => {
       state.selectedEpisode = ep.episode;
       render();
@@ -146,7 +146,9 @@ function renderDetail(app, series) {
   const selected = series.episodes.find((e) => e.episode === state.selectedEpisode) || series.episodes[0];
   const player = document.getElementById("player");
   player.src = selected.videoUrl;
-  document.getElementById("player-meta").textContent = `${series.name} / 第 ${selected.episode} 集 / ${selected.videoUrl}`;
+  document.getElementById("player-meta").textContent = `${series.name}
+第${selected.episode}集
+${selected.videoUrl}`;
 }
 
 window.addEventListener("popstate", render);
