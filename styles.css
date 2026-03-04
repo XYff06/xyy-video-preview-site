@@ -127,8 +127,8 @@ body { margin: 0; background: var(--bg); color: var(--text); }
   background: #fff;
   padding: 12px;
 }
-#player { width: 100%; min-height: 280px; background: #000; }
-#player-meta { margin: 8px 0 0; color: #677081; font-size: 12px; }
+#player { width: 100%; aspect-ratio: 16 / 9; display: block; background: #000; }
+#player-meta { margin: 8px 0 0; color: #677081; font-size: 12px; white-space: pre-line; line-height: 1.6; }
 
 @media (max-width: 900px) {
   .top-categories { grid-template-columns: repeat(4, minmax(0, 1fr)); }
