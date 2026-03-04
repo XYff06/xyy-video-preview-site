@@ -103,9 +103,9 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 
 .episode-row {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(10, minmax(0, 1fr));
   gap: 10px;
-  margin-bottom: 8px;
+  margin-top: 12px;
 }
 .episode-tab {
   width: 100%;
@@ -127,7 +127,7 @@ body { margin: 0; background: var(--bg); color: var(--text); }
   background: #fff;
   padding: 12px;
 }
-#player { width: 100%; aspect-ratio: 16 / 9; display: block; background: #000; }
+#player { width: 100%; aspect-ratio: 16 / 7; display: block; background: #000; }
 #player-meta { margin: 8px 0 0; color: #677081; font-size: 12px; white-space: pre-line; line-height: 1.6; }
 
 @media (max-width: 900px) {
