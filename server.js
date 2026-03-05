@@ -115,6 +115,15 @@ function sendMethodNotAllowed(res, allowedMethods) {
   res.end(JSON.stringify({ message: `Method not allowed. Allowed: ${allowedMethods.join(', ')}` }));
 }
 
+function sendMethodNotAllowed(res, allowedMethods) {
+  res.writeHead(405, {
+    'Content-Type': MIME_TYPES['.json'],
+    Allow: allowedMethods.join(', ')
+  });
+  res.end(JSON.stringify({ message: `Method not allowed. Allowed: ${allowedMethods.join(', ')}` }));
+}
+
+
 function serveStatic(reqPath, res) {
   const unsafePath = reqPath === '/' ? '/index.html' : reqPath;
   const normalizedPath = path.normalize(unsafePath).replace(/^([.][.][/\\])+/, '');
