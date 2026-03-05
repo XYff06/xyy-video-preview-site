@@ -7,13 +7,35 @@ const HOST = '0.0.0.0';
 const PORT = Number(process.env.PORT) || 4173;
 const ROOT_DIR = __dirname;
 
-const pool = new Pool({
-  host: process.env.PGHOST || '127.0.0.1',
-  port: Number(process.env.PGPORT) || 5432,
-  user: process.env.PGUSER || 'postgres',
-  password: process.env.PGPASSWORD || 'xyy76',
-  database: process.env.PGDATABASE || 'video_preview'
-});
+function optionalEnv(name) {
+  const value = process.env[name];
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : undefined;
+}
+
+function buildPgConfig() {
+  const databaseUrl = optionalEnv('DATABASE_URL');
+  if (databaseUrl) {
+    return { connectionString: databaseUrl };
+  }
+
+  const passwordFromEnv = optionalEnv('PGPASSWORD') ?? optionalEnv('POSTGRES_PASSWORD');
+  const config = {
+    host: optionalEnv('PGHOST') || '127.0.0.1',
+    port: Number(optionalEnv('PGPORT')) || 5432,
+    user: optionalEnv('PGUSER') || 'postgres',
+    database: optionalEnv('PGDATABASE') || 'video_preview'
+  };
+
+  if (typeof passwordFromEnv === 'string') {
+    config.password = passwordFromEnv;
+  }
+
+  return config;
+}
+
+const pool = new Pool(buildPgConfig());
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -83,6 +105,14 @@ function getAllowedMethods(pathname) {
   if (pathname.startsWith('/api/titles/')) return ['PATCH', 'DELETE'];
   if (pathname === '/api/episodes') return ['POST', 'PATCH', 'DELETE'];
   return null;
+}
+
+function sendMethodNotAllowed(res, allowedMethods) {
+  res.writeHead(405, {
+    'Content-Type': MIME_TYPES['.json'],
+    Allow: allowedMethods.join(', ')
+  });
+  res.end(JSON.stringify({ message: `Method not allowed. Allowed: ${allowedMethods.join(', ')}` }));
 }
 
 function sendMethodNotAllowed(res, allowedMethods) {
@@ -485,7 +515,14 @@ const server = http.createServer(async (req, res) => {
 
     sendJson(res, 405, { message: 'Method not allowed.' });
   } catch (error) {
-    sendJson(res, 500, { message: error.message || 'Internal server error' });
+    const message = error?.message || 'Internal server error';
+    if (message.includes('SASL: SCRAM-SERVER-FIRST-MESSAGE: client password must be a string')) {
+      sendJson(res, 500, {
+        message: '数据库认证失败：当前 PostgreSQL 使用 SCRAM 且未提供有效密码。请设置 PGPASSWORD（或 POSTGRES_PASSWORD / DATABASE_URL）后重启服务。'
+      });
+      return;
+    }
+    sendJson(res, 500, { message });
   }
 });
 

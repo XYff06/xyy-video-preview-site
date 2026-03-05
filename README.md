@@ -98,3 +98,12 @@ export PGUSER=postgres
 export PGPASSWORD=你的密码
 export PGDATABASE=video_preview
 ```
+
+
+6. 如果数据库开启了 SCRAM 认证，请确保设置了密码环境变量（`PGPASSWORD` 或 `POSTGRES_PASSWORD`），否则会报：`client password must be a string`。
+
+也可以直接使用连接串：
+
+```bash
+export DATABASE_URL=postgresql://postgres:你的密码@127.0.0.1:5432/video_preview
+```
