@@ -234,6 +234,7 @@ const server = http.createServer(async (req, res) => {
         pageSize: parsePositiveInt(url.searchParams.get('pageSize'), 25)
       });
       sendJson(res, 200, payload);
+
       return;
     }
 
