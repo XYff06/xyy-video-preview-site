@@ -2,7 +2,15 @@ const fmt = (iso) => new Date(iso).toLocaleString('zh-CN', { hour12: false });
 
 const state = {
   allSeries: [],
+  allTags: [],
   selectedTag: null,
+  searchQuery: '',
+  currentPage: 1,
+  pageSize: 25,
+  homeSeries: [],
+  homeTotal: 0,
+  homeLoading: false,
+  homeError: null,
   selectedEpisode: 1,
   tagExpanded: false,
   loading: true,
@@ -31,10 +39,18 @@ async function apiFetch(url, options = {}) {
   return payload;
 }
 
+async function loadTags() {
+  const payload = await apiFetch('/api/tags');
+  state.allTags = payload.data;
+}
+
 async function loadSeries() {
   try {
-    const payload = await apiFetch('/api/series');
-    state.allSeries = payload.data.map((item) => ({ ...item, tags: new Set(item.tags) }));
+    const [seriesPayload] = await Promise.all([
+      apiFetch('/api/series?page=1&pageSize=10000'),
+      loadTags()
+    ]);
+    state.allSeries = seriesPayload.data.map((item) => ({ ...item, tags: new Set(item.tags) }));
     state.loading = false;
     state.error = null;
   } catch (error) {
@@ -43,11 +59,45 @@ async function loadSeries() {
   }
 
   render();
+
+  if (!currentPathName()) {
+    await loadHomeSeries();
+  }
+}
+
+async function loadHomeSeries() {
+  state.homeLoading = true;
+  state.homeError = null;
+  render();
+
+  const params = new URLSearchParams();
+  params.set('page', String(state.currentPage));
+  params.set('pageSize', String(state.pageSize));
+  if (state.selectedTag) params.set('tag', state.selectedTag);
+  if (state.searchQuery.trim()) params.set('search', state.searchQuery.trim());
+
+  try {
+    const payload = await apiFetch(`/api/series?${params.toString()}`);
+    state.homeSeries = payload.data;
+    state.homeTotal = payload.pagination?.total ?? payload.data.length;
+    state.currentPage = payload.pagination?.page ?? state.currentPage;
+    state.homeLoading = false;
+    state.homeError = null;
+  } catch (error) {
+    state.homeSeries = [];
+    state.homeTotal = 0;
+    state.homeLoading = false;
+    state.homeError = error.message;
+  }
+
+  render();
 }
 
 function getAllTags() {
+  if (state.allTags.length) return [...state.allTags];
   return [...new Set(state.allSeries.flatMap((item) => [...item.tags]))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
 }
+
 
 function escapeHtml(value) {
   return String(value)
@@ -118,7 +168,12 @@ function fillEpisodeSelectByTitle(titleSelect, episodeSelect, placeholderText) {
 
 function getFlashHtml() {
   if (!state.flashMessage) return '';
-  return `<div class="flash-msg">${state.flashMessage}</div>`;
+  return `
+    <div class="flash-msg" role="status">
+      <span class="flash-text">${state.flashMessage}</span>
+      <button type="button" class="flash-close" id="flash-close-btn" aria-label="关闭提示">✕</button>
+    </div>
+  `;
 }
 
 function getAdminModalHtml() {
@@ -175,6 +230,14 @@ function render() {
     render();
   };
 
+  const flashCloseBtn = document.getElementById('flash-close-btn');
+  if (flashCloseBtn) {
+    flashCloseBtn.onclick = () => {
+      state.flashMessage = '';
+      render();
+    };
+  }
+
   if (state.adminModalOpen) {
     document.getElementById('close-admin').onclick = () => {
       state.adminModalOpen = false;
@@ -218,6 +281,17 @@ function renderHome(container) {
   topRowLeft.innerHTML = '<header class="top-categories" id="category-list"></header>';
   const categoryList = document.getElementById('category-list');
   const grid = document.getElementById('series-grid');
+  const homePage = container.querySelector('.home-page');
+
+  const searchBar = document.createElement('section');
+  searchBar.className = 'home-search-bar';
+  searchBar.innerHTML = `
+    <form id="global-search-form" class="search-form">
+      <input id="global-search" class="global-search" type="search" placeholder="全局搜索：输入漫剧名称" value="${escapeHtml(state.searchQuery)}" />
+      <button type="submit" class="primary-btn search-btn">搜索</button>
+    </form>
+  `;
+  homePage.insertBefore(searchBar, grid);
 
   const allTags = getAllTags();
   const visibleTags = state.tagExpanded ? allTags : allTags.slice(0, 5);
@@ -248,14 +322,33 @@ function renderHome(container) {
       } else {
         state.tagExpanded = !state.tagExpanded;
       }
-      render();
+      state.currentPage = 1;
+      loadHomeSeries();
     };
     categoryList.appendChild(btn);
   });
 
-  state.allSeries
-    .filter((s) => !state.selectedTag || s.tags.has(state.selectedTag))
-    .forEach((series) => {
+  const searchForm = document.getElementById('global-search-form');
+  const searchInput = document.getElementById('global-search');
+  searchForm.onsubmit = (event) => {
+    event.preventDefault();
+    state.searchQuery = searchInput.value;
+    state.currentPage = 1;
+    loadHomeSeries();
+  };
+
+  if (state.homeError) {
+    grid.innerHTML = `<p class="empty-state">加载失败：${state.homeError}</p>`;
+  }
+
+  if (state.homeLoading) {
+    grid.innerHTML = '<p class="empty-state">正在加载列表...</p>';
+  }
+
+  const totalPages = Math.max(1, Math.ceil(state.homeTotal / state.pageSize));
+  const pageSeries = state.homeSeries;
+
+  pageSeries.forEach((series) => {
       const card = document.createElement('article');
       card.className = 'poster-card';
       card.innerHTML = `
@@ -269,6 +362,75 @@ function renderHome(container) {
       };
       grid.appendChild(card);
     });
+
+  if (pageSeries.length === 0) {
+    grid.innerHTML = '<p class="empty-state">没有匹配的漫剧</p>';
+  }
+
+  const buildPageList = () => {
+    const pages = new Set([1, totalPages]);
+    for (let i = state.currentPage - 2; i <= state.currentPage + 2; i += 1) {
+      if (i >= 1 && i <= totalPages) pages.add(i);
+    }
+    return [...pages].sort((a, b) => a - b);
+  };
+
+  const pageItems = buildPageList();
+  const pagination = document.createElement('div');
+  pagination.className = 'pagination';
+  pagination.innerHTML = `
+    <button type="button" class="page-btn" data-page="prev" ${state.currentPage === 1 ? 'disabled' : ''}>上一页</button>
+    <div class="page-numbers">
+      ${pageItems.map((pageNo, idx) => {
+        const prev = pageItems[idx - 1];
+        const ellipsis = prev && pageNo - prev > 1 ? '<span class="page-ellipsis">…</span>' : '';
+        return `${ellipsis}<button type="button" class="page-number-btn ${pageNo === state.currentPage ? 'active' : ''}" data-page-no="${pageNo}">${pageNo}</button>`;
+      }).join('')}
+    </div>
+    <button type="button" class="page-btn" data-page="next" ${state.currentPage === totalPages ? 'disabled' : ''}>下一页</button>
+    <span class="page-meta">第 ${state.currentPage} / ${totalPages} 页（共 ${state.homeTotal} 个）</span>
+    <form class="page-jump-form" id="page-jump-form">
+      <label for="page-jump-input">跳转</label>
+      <input id="page-jump-input" type="number" min="1" max="${totalPages}" value="${state.currentPage}" />
+      <button type="submit" class="page-jump-btn">确定</button>
+    </form>
+  `;
+
+  const prevBtn = pagination.querySelector('[data-page="prev"]');
+  const nextBtn = pagination.querySelector('[data-page="next"]');
+  prevBtn.onclick = () => {
+    if (state.currentPage <= 1) return;
+    state.currentPage -= 1;
+    loadHomeSeries();
+  };
+  nextBtn.onclick = () => {
+    if (state.currentPage >= totalPages) return;
+    state.currentPage += 1;
+    loadHomeSeries();
+  };
+
+  pagination.querySelectorAll('[data-page-no]').forEach((btn) => {
+    btn.onclick = () => {
+      const pageNo = Number(btn.dataset.pageNo);
+      if (!Number.isFinite(pageNo) || pageNo === state.currentPage) return;
+      state.currentPage = pageNo;
+      loadHomeSeries();
+    };
+  });
+
+  const jumpForm = pagination.querySelector('#page-jump-form');
+  jumpForm.onsubmit = (event) => {
+    event.preventDefault();
+    const input = jumpForm.querySelector('#page-jump-input');
+    const nextPage = Number(input.value);
+    if (!Number.isFinite(nextPage)) return;
+    const safePage = Math.min(totalPages, Math.max(1, Math.floor(nextPage)));
+    if (safePage === state.currentPage) return;
+    state.currentPage = safePage;
+    loadHomeSeries();
+  };
+
+  container.querySelector('.home-page').appendChild(pagination);
 }
 
 function renderDetail(container, series) {
@@ -278,7 +440,7 @@ function renderDetail(container, series) {
 
   document.getElementById('back-home').onclick = () => {
     history.pushState({}, '', '/');
-    render();
+    loadHomeSeries();
   };
 
   const episodeRow = document.getElementById('episode-row');
@@ -295,8 +457,16 @@ function renderDetail(container, series) {
 
   const selected = series.episodes.find((e) => e.episode === state.selectedEpisode) || series.episodes[0];
   const player = document.getElementById('player');
+  const playerMeta = document.getElementById('player-meta');
+
+  if (!selected) {
+    player.removeAttribute('src');
+    playerMeta.textContent = `${series.name}\n暂无剧集，请先在管理后台新增内容`;
+    return;
+  }
+
   player.src = selected.videoUrl;
-  document.getElementById('player-meta').textContent = `${series.name}\n第${selected.episode}集\n首次入库：${fmt(selected.firstIngestedAt)}\n最近更新：${fmt(selected.updatedAt)}\n${selected.videoUrl}`;
+  playerMeta.textContent = `${series.name}\n第${selected.episode}集\n首次入库：${fmt(selected.firstIngestedAt)}\n最近更新：${fmt(selected.updatedAt)}\n${selected.videoUrl}`;
 }
 
 function renderAdminPanel(container) {
@@ -356,10 +526,11 @@ function renderAdminPanel(container) {
         try {
           await apiFetch('/api/tags', { method: 'POST', body: JSON.stringify({ tagName }) });
           state.flashMessage = `标签「${tagName}」已创建`;
+          await loadSeries();
         } catch (error) {
           state.flashMessage = error.message;
+          render();
         }
-        render();
       };
     }
 
@@ -376,10 +547,11 @@ function renderAdminPanel(container) {
           await apiFetch(`/api/tags/${encodeURIComponent(tag)}`, { method: 'PATCH', body: JSON.stringify({ newTagName }) });
           state.flashMessage = '标签改名成功';
           if (state.selectedTag === tag) state.selectedTag = newTagName;
+          await loadSeries();
         } catch (error) {
           state.flashMessage = error.message;
+          render();
         }
-        render();
       };
     }
 
@@ -396,10 +568,11 @@ function renderAdminPanel(container) {
           await apiFetch(`/api/tags/${encodeURIComponent(tag)}`, { method: 'DELETE' });
           state.flashMessage = '标签删除成功';
           if (state.selectedTag === tag) state.selectedTag = null;
+          await loadSeries();
         } catch (error) {
           state.flashMessage = error.message;
+          render();
         }
-        render();
       };
     }
     return;
@@ -702,6 +875,12 @@ function renderAdminPanel(container) {
   }
 }
 
-window.addEventListener('popstate', render);
+window.addEventListener('popstate', () => {
+  if (currentPathName()) {
+    render();
+    return;
+  }
+  loadHomeSeries();
+});
 render();
 loadSeries();
