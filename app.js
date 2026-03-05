@@ -215,7 +215,7 @@ function renderHome(container) {
 
 function renderDetail(container, series) {
   const topRowLeft = document.getElementById('top-row-left');
-  topRowLeft.innerHTML = '<button id="back-home" class="back-btn">← 返回首页</button>';
+  topRowLeft.innerHTML = '<button id="back-home" class="back-btn">⬅ 首页</button>';
   container.innerHTML = document.getElementById('detail-template').innerHTML;
 
   document.getElementById('back-home').onclick = () => {
@@ -539,7 +539,6 @@ function renderAdminPanel(container) {
           <button type="submit">删除</button>
         </form>
       </section>
-      <p class="hint">支持新增、修改、删除剧集。</p>
     </section>
   `;
 
