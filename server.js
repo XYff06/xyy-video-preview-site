@@ -350,10 +350,6 @@ const server = http.createServer(async (req, res) => {
           [name, poster]
         );
         const titleId = titleInsert.rows[0].id;
-        await client.query(
-          'INSERT INTO episode(title_id, episode_no, episode_url) VALUES ($1, 1, $2)',
-          [titleId, `https://cdn.example.com/videos/${encodeURIComponent(name)}/1.mp4`]
-        );
         if (tags.length) {
           const tagRows = await client.query('SELECT id, tag_name FROM tag WHERE tag_name = ANY($1)', [tags]);
           const tagIdMap = new Map(tagRows.rows.map((r) => [r.tag_name, r.id]));
@@ -374,7 +370,7 @@ const server = http.createServer(async (req, res) => {
       } finally {
         client.release();
       }
-      sendJson(res, 201, { message: '漫剧已创建（默认含第1集）' });
+      sendJson(res, 201, { message: '漫剧已创建' });
       return;
     }
 

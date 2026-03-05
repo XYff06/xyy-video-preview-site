@@ -63,9 +63,32 @@ body { margin: 0; background: var(--bg); color: var(--text); }
   margin-bottom: 12px;
   border: 1px solid #cfe3ff;
   background: #edf5ff;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border-radius: 10px;
   font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 50%;
+  min-width: 260px;
+  max-width: 560px;
+}
+
+.flash-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flash-close {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: #5f6d84;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
 }
 
 .top-categories {
@@ -105,10 +128,10 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 .global-search {
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 10px;
-  height: 42px;
-  padding: 0 12px;
-  font-size: 14px;
+  border-radius: 999px;
+  height: 50px;
+  padding: 0 18px;
+  font-size: 16px;
 }
 
 .global-search:focus {
@@ -117,9 +140,10 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 }
 
 .search-btn {
-  height: 42px;
-  min-width: 84px;
-  padding: 0 18px;
+  height: 50px;
+  min-width: 96px;
+  padding: 0 22px;
+  border-radius: 999px;
 }
 
 .empty-state {
@@ -133,16 +157,19 @@ body { margin: 0; background: var(--bg); color: var(--text); }
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
   margin-top: 14px;
 }
 
-.page-btn {
+.page-btn,
+.page-number-btn,
+.page-jump-btn {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
   height: 34px;
-  padding: 0 14px;
+  padding: 0 12px;
   cursor: pointer;
 }
 
@@ -151,9 +178,43 @@ body { margin: 0; background: var(--bg); color: var(--text); }
   opacity: 0.45;
 }
 
+.page-numbers {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.page-number-btn.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+.page-ellipsis {
+  color: var(--muted);
+  font-size: 14px;
+  padding: 0 2px;
+}
+
 .page-meta {
   color: #5a6270;
   font-size: 13px;
+}
+
+.page-jump-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #5a6270;
+  font-size: 13px;
+}
+
+#page-jump-input {
+  width: 70px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 8px;
 }
 .poster-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
 .poster-card { border-radius: 18px; border: 1px solid var(--line); padding: 10px; background: #f2f3f5; cursor: pointer; transition: all 0.2s ease; }
