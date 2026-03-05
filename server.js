@@ -66,6 +66,7 @@ function readBody(req) {
   });
 }
 
+
 function normalizePathname(pathname) {
   if (pathname.length > 1 && pathname.endsWith('/')) {
     return pathname.slice(0, -1);
@@ -92,6 +93,7 @@ function sendMethodNotAllowed(res, allowedMethods) {
   });
   res.end(JSON.stringify({ message: `Method not allowed. Allowed: ${allowedMethods.join(', ')}` }));
 }
+
 
 function serveStatic(reqPath, res) {
   const unsafePath = reqPath === '/' ? '/index.html' : reqPath;
@@ -242,18 +244,24 @@ const server = http.createServer(async (req, res) => {
   const pathname = normalizePathname(url.pathname);
 
   try {
+
     if (pathname === '/api/health' && req.method === 'GET') {
+
       await pool.query('SELECT 1');
       sendJson(res, 200, { status: 'ok' });
       return;
     }
 
+
     if (pathname === '/api/ingest-records' && req.method === 'GET') {
+
       sendJson(res, 200, { data: await getFlatIngestRecords() });
       return;
     }
 
+
     if (pathname === '/api/series' && req.method === 'GET') {
+
       const payload = await querySeries({
         tag: url.searchParams.get('tag'),
         name: url.searchParams.get('name'),
@@ -262,10 +270,12 @@ const server = http.createServer(async (req, res) => {
         pageSize: parsePositiveInt(url.searchParams.get('pageSize'), 25)
       });
       sendJson(res, 200, payload);
+
       return;
     }
 
     if (pathname === '/api/tags' && req.method === 'GET') {
+
       const { rows } = await pool.query('SELECT tag_name FROM tag ORDER BY sort_no ASC, tag_name ASC');
       sendJson(res, 200, { data: rows.map((r) => r.tag_name) });
       return;
@@ -394,7 +404,9 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+
     if (pathname === '/api/episodes' && req.method === 'POST') {
+
       const body = await readBody(req);
       const episodeTitleName = String(body.titleName || '').trim();
       const episodeNo = Number(body.episodeNo);
@@ -414,7 +426,9 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+
     if (pathname === '/api/episodes' && req.method === 'PATCH') {
+
       const body = await readBody(req);
       const episodeTitleName = String(body.titleName || '').trim();
       const sourceNo = Number(body.episodeNo);
@@ -453,6 +467,7 @@ const server = http.createServer(async (req, res) => {
       );
       if (!result.rowCount) return sendJson(res, 404, { message: '剧集不存在' });
       sendJson(res, 200, { message: '剧集删除成功' });
+
       return;
     }
 
@@ -474,6 +489,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       sendJson(res, 404, { message: 'API endpoint not found.' });
+
       return;
     }
 
