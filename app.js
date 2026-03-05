@@ -236,9 +236,8 @@ function renderAdminPanel(container) {
     const tags = getAllTags();
     container.innerHTML = `
       <section class="admin-panel">
-        <h3>标签管理</h3>
         <div class="action-tabs">
-          <button type="button" class="action-tab-btn ${state.activeTagAction === 'create' ? 'active' : ''}" data-tag-action="create">新标签名</button>
+          <button type="button" class="action-tab-btn ${state.activeTagAction === 'create' ? 'active' : ''}" data-tag-action="create">新增标签</button>
           <button type="button" class="action-tab-btn ${state.activeTagAction === 'rename' ? 'active' : ''}" data-tag-action="rename">修改标签</button>
           <button type="button" class="action-tab-btn ${state.activeTagAction === 'delete' ? 'active' : ''}" data-tag-action="delete">删除标签</button>
         </div>
@@ -246,7 +245,7 @@ function renderAdminPanel(container) {
         <section class="action-panel ${state.activeTagAction === 'create' ? '' : 'hidden'}">
           <form id="tag-create-form" class="inline-form">
             <input name="tagName" required placeholder="标签名" />
-            <button type="submit">新增标签</button>
+            <button type="submit">新增</button>
           </form>
         </section>
 
@@ -267,7 +266,7 @@ function renderAdminPanel(container) {
               <option value="">选择标签</option>
               ${tags.map((tag) => `<option value="${tag}">${tag}</option>`).join('')}
             </select>
-            <button type="submit">删除标签</button>
+            <button type="submit">删除</button>
           </form>
         </section>
       </section>
@@ -342,21 +341,20 @@ function renderAdminPanel(container) {
     const tags = getAllTags();
     container.innerHTML = `
       <section class="admin-panel">
-        <h3>漫剧管理</h3>
         <div class="action-tabs">
           <button type="button" class="action-tab-btn ${state.activeTitleAction === 'create' ? 'active' : ''}" data-title-action="create">新增漫剧</button>
-          <button type="button" class="action-tab-btn ${state.activeTitleAction === 'rename' ? 'active' : ''}" data-title-action="rename">漫剧改名</button>
+          <button type="button" class="action-tab-btn ${state.activeTitleAction === 'rename' ? 'active' : ''}" data-title-action="rename">修改漫剧</button>
           <button type="button" class="action-tab-btn ${state.activeTitleAction === 'delete' ? 'active' : ''}" data-title-action="delete">删除漫剧</button>
         </div>
 
         <section class="action-panel ${state.activeTitleAction === 'create' ? '' : 'hidden'}">
           <form id="title-create-form" class="stack-form">
-            <input name="name" required placeholder="新漫剧名称" />
-            <input name="poster" required placeholder="海报 URL" />
+            <input name="name" required placeholder="漫剧名" />
+            <input name="poster" required placeholder="海报URL" />
             <select name="tags" multiple>
               ${tags.length ? tags.map((tag) => `<option value="${tag}">${tag}</option>`).join('') : '<option value="" disabled>暂无可选标签</option>'}
             </select>
-            <button type="submit">新增漫剧</button>
+            <button type="submit">新增</button>
           </form>
         </section>
 
@@ -366,10 +364,9 @@ function renderAdminPanel(container) {
               <option value="">选择漫剧</option>
               ${state.allSeries.map((series) => `<option value="${series.name}">${series.name}</option>`).join('')}
             </select>
-            <input name="newName" required placeholder="改名后的漫剧名称" />
+            <input name="newName" required placeholder="新漫剧名" />
             <button type="submit">修改</button>
           </form>
-          <p class="hint">只执行改名操作，提交前请填写新名称。</p>
         </section>
 
         <section class="action-panel ${state.activeTitleAction === 'delete' ? '' : 'hidden'}">
@@ -378,9 +375,8 @@ function renderAdminPanel(container) {
               <option value="">选择漫剧</option>
               ${state.allSeries.map((series) => `<option value="${series.name}">${series.name}</option>`).join('')}
             </select>
-            <button type="submit">删除漫剧</button>
+            <button type="submit">删除</button>
           </form>
-          <p class="hint">删除会清空该漫剧下全部剧集内容。</p>
         </section>
       </section>
     `;
@@ -460,7 +456,6 @@ function renderAdminPanel(container) {
 
   container.innerHTML = `
     <section class="admin-panel">
-      <h3>内容管理</h3>
       <form id="episode-update-form" class="stack-form">
         <select name="titleName" required>
           <option value="">选择漫剧</option>
