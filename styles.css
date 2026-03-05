@@ -145,6 +145,21 @@ body { margin: 0; background: var(--bg); color: var(--text); }
   border-color: var(--brand);
 }
 
+.global-sort {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  height: 50px;
+  padding: 0 14px;
+  font-size: 15px;
+  color: #2a3040;
+  background: #fff;
+}
+
+.global-sort:focus {
+  outline: 2px solid rgba(11, 99, 200, 0.2);
+  border-color: var(--brand);
+}
+
 .search-btn {
   height: 50px;
   min-width: 96px;

@@ -5,6 +5,7 @@ const state = {
   allTags: [],
   selectedTag: null,
   searchQuery: '',
+  sortBy: 'updated_desc',
   currentPage: 1,
   pageSize: 25,
   homeSeries: [],
@@ -75,6 +76,7 @@ async function loadHomeSeries() {
   params.set('pageSize', String(state.pageSize));
   if (state.selectedTag) params.set('tag', state.selectedTag);
   if (state.searchQuery.trim()) params.set('search', state.searchQuery.trim());
+  params.set('sort', state.sortBy);
 
   try {
     const payload = await apiFetch(`/api/series?${params.toString()}`);
@@ -288,6 +290,14 @@ function renderHome(container) {
   searchBar.innerHTML = `
     <form id="global-search-form" class="search-form">
       <input id="global-search" class="global-search" type="search" placeholder="全局搜索：输入漫剧名称" value="${escapeHtml(state.searchQuery)}" />
+      <select id="global-sort" class="global-sort" aria-label="排序依据">
+        <option value="updated_desc" ${state.sortBy === 'updated_desc' ? 'selected' : ''}>最后更新时间（倒序）</option>
+        <option value="updated_asc" ${state.sortBy === 'updated_asc' ? 'selected' : ''}>最后更新时间（顺序）</option>
+        <option value="ingested_asc" ${state.sortBy === 'ingested_asc' ? 'selected' : ''}>最早入库时间（顺序）</option>
+        <option value="ingested_desc" ${state.sortBy === 'ingested_desc' ? 'selected' : ''}>最早入库时间（倒序）</option>
+        <option value="name_asc" ${state.sortBy === 'name_asc' ? 'selected' : ''}>名称（顺序）</option>
+        <option value="name_desc" ${state.sortBy === 'name_desc' ? 'selected' : ''}>名称（倒序）</option>
+      </select>
       <button type="submit" class="primary-btn search-btn">搜索</button>
     </form>
   `;
@@ -330,9 +340,17 @@ function renderHome(container) {
 
   const searchForm = document.getElementById('global-search-form');
   const searchInput = document.getElementById('global-search');
+  const sortSelect = document.getElementById('global-sort');
   searchForm.onsubmit = (event) => {
     event.preventDefault();
     state.searchQuery = searchInput.value;
+    state.sortBy = sortSelect.value;
+    state.currentPage = 1;
+    loadHomeSeries();
+  };
+
+  sortSelect.onchange = () => {
+    state.sortBy = sortSelect.value;
     state.currentPage = 1;
     loadHomeSeries();
   };
@@ -460,6 +478,8 @@ function renderDetail(container, series) {
   });
 
   const selected = series.episodes.find((e) => e.episode === state.selectedEpisode) || series.episodes[0];
+  const maxEpisode = series.episodes.reduce((max, ep) => Math.max(max, Number(ep.episode) || 0), 0);
+  const totalEpisodes = series.episodes.length;
   const player = document.getElementById('player');
   const playerMeta = document.getElementById('player-meta');
 
@@ -475,6 +495,14 @@ function renderDetail(container, series) {
   player.src = selected.videoUrl;
   playerMeta.innerHTML = `
     <p class="player-meta-title">${escapeHtml(series.name)}</p>
+    <p class="player-meta-time-row">
+      <span>最大集数：${escapeHtml(maxEpisode || 0)}</span>
+      <span>总集数：${escapeHtml(totalEpisodes)}</span>
+    </p>
+    <p class="player-meta-time-row">
+      <span>最后更新时间：${escapeHtml(fmt(series.updatedAt))}</span>
+      <span>入库时间：${escapeHtml(fmt(series.firstIngestedAt))}</span>
+    </p>
     <p class="player-meta-time-row">
       <span>首次入库：${escapeHtml(fmt(selected.firstIngestedAt))}</span>
       <span>最近更新：${escapeHtml(fmt(selected.updatedAt))}</span>

@@ -153,7 +153,20 @@ function serveStatic(reqPath, res) {
   });
 }
 
-async function querySeries({ tag, name, search, page, pageSize }) {
+function resolveSort(sort) {
+  const sortMap = {
+    updated_desc: 't.updated_at DESC, t.name ASC',
+    updated_asc: 't.updated_at ASC, t.name ASC',
+    ingested_asc: 't.first_ingested_at ASC, t.name ASC',
+    ingested_desc: 't.first_ingested_at DESC, t.name ASC',
+    name_asc: 't.name ASC',
+    name_desc: 't.name DESC'
+  };
+
+  return sortMap[sort] || sortMap.updated_desc;
+}
+
+async function querySeries({ tag, name, search, sort, page, pageSize }) {
   const filters = [];
   const values = [];
 
@@ -190,6 +203,8 @@ async function querySeries({ tag, name, search, page, pageSize }) {
   const limitIndex = listValues.length - 1;
   const offsetIndex = listValues.length;
 
+  const orderByClause = resolveSort(sort);
+
   const listSql = `
     SELECT
       t.id,
@@ -219,7 +234,7 @@ async function querySeries({ tag, name, search, page, pageSize }) {
     LEFT JOIN tag g ON g.id = tt.tag_id
     ${whereClause}
     GROUP BY t.id
-    ORDER BY "lastNewEpisodeAt" DESC
+    ORDER BY ${orderByClause}
     LIMIT $${limitIndex} OFFSET $${offsetIndex}
   `;
 
@@ -289,6 +304,7 @@ const server = http.createServer(async (req, res) => {
         tag: url.searchParams.get('tag'),
         name: url.searchParams.get('name'),
         search: url.searchParams.get('search'),
+        sort: url.searchParams.get('sort'),
         page: parsePositiveInt(url.searchParams.get('page'), 1),
         pageSize: parsePositiveInt(url.searchParams.get('pageSize'), 25)
       });
