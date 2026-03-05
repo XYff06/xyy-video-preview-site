@@ -582,7 +582,7 @@ function renderAdminPanel(container) {
             ${state.allSeries.map((series) => `<option value="${series.name}">${series.name}</option>`).join('')}
           </select>
           <select name="episodeNo" required>
-            <option value="">当前集号</option>
+            <option value="">选择集号</option>
           </select>
           <input type="number" min="1" name="newEpisodeNo" required placeholder="新集号" />
           <input name="videoUrl" required placeholder="新播放URL" />
