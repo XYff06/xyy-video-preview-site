@@ -72,7 +72,7 @@ function getTagMultiSelectHtml(fieldName, tags, selectedTags = []) {
   const selected = new Set(selectedTags);
   const selectedText = selected.size
     ? [...selected].map((tag) => escapeHtml(tag)).join('、')
-    : '选择标签（可多选）';
+    : '选择标签(可多选)';
 
   return `
     <details class="multi-select" data-multi-select>
@@ -96,7 +96,7 @@ function bindMultiSelectSummary(scope) {
 
     const updateSummary = () => {
       const checked = [...multiSelect.querySelectorAll('input[type="checkbox"]:checked')].map((input) => input.value);
-      summary.textContent = checked.length ? checked.join('、') : '选择标签（可多选）';
+      summary.textContent = checked.length ? checked.join('、') : '选择标签(可多选)';
     };
 
     multiSelect.querySelectorAll('input[type="checkbox"]').forEach((input) => {
