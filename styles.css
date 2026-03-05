@@ -10,23 +10,36 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); }
-.app { width: min(1400px, 96%); margin: 0 auto; padding: 22px 16px 40px; }
+.app { width: 100vw; min-height: 100vh; padding: 0; }
 
-.layout-shell { display: block; }
-.content-shell { min-width: 0; }
-
-.top-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 12px;
-  gap: 12px;
+.layout-shell {
+  display: grid;
+  grid-template-columns: 7% minmax(0, 1fr) 7%;
+  width: 100%;
+  min-height: 100vh;
 }
 
-#top-row-left {
-  flex: 1;
+.side-rail {
   min-width: 0;
+  padding: 22px 10px 40px;
 }
+
+.left-rail {
+  display: flex;
+  justify-content: center;
+}
+
+.right-rail {
+  display: flex;
+  justify-content: center;
+}
+
+.content-shell {
+  min-width: 0;
+  padding: 22px 16px 40px;
+}
+
+#top-row-left { width: 100%; }
 
 .primary-btn {
   border: 1px solid var(--brand);
@@ -40,7 +53,8 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 }
 
 .manage-btn {
-  width: 56px;
+  width: 100%;
+  max-width: 86px;
   height: 42px;
   padding: 0;
 }
@@ -56,9 +70,8 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 
 .top-categories {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 14px;
-  margin-bottom: 26px;
+  grid-template-columns: 1fr;
+  gap: 10px;
 }
 
 .category-pill {
@@ -87,7 +100,7 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 .poster-title { margin: 0; text-align: center; font-size: 15px; font-weight: 650; color: #26292d; transition: all 0.2s ease; }
 .poster-card:hover .poster-title { color: var(--brand); font-weight: 700; }
 
-.back-btn { border: 0; background: transparent; color: var(--brand); font-size: 15px; margin-bottom: 16px; cursor: pointer; }
+.back-btn { width: 100%; border: 0; border-radius: 10px; background: #eaf2ff; color: var(--brand); font-size: 15px; margin-bottom: 16px; cursor: pointer; padding: 10px 8px; }
 
 .episode-row { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
 .episode-tab { width: 100%; padding: 9px 10px; border-radius: 999px; border: 1px solid var(--line); background: #f9fafb; font-size: 14px; color: #3a3f46; cursor: pointer; }
@@ -229,4 +242,33 @@ body { margin: 0; background: var(--bg); color: var(--text); }
   .poster-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
   .admin-modal-tabs { grid-template-columns: 1fr; }
   .action-tabs { grid-template-columns: 1fr; }
+}
+
+
+@media (max-width: 1100px) {
+  .layout-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .side-rail {
+    padding: 12px 16px 0;
+  }
+
+  .left-rail,
+  .right-rail {
+    justify-content: flex-start;
+  }
+
+  .top-categories {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .manage-btn {
+    width: auto;
+    padding: 0 16px;
+  }
+
+  .content-shell {
+    padding-top: 12px;
+  }
 }
