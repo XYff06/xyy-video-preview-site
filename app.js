@@ -511,7 +511,7 @@ function renderAdminPanel(container) {
             ${state.allSeries.map((series) => `<option value="${series.name}">${series.name}</option>`).join('')}
           </select>
           <input type="number" min="1" name="episodeNo" required placeholder="集号" />
-          <input name="videoUrl" required placeholder="播放 URL" />
+          <input name="videoUrl" required placeholder="播放URL" />
           <button type="submit">新增</button>
         </form>
       </section>
@@ -524,7 +524,7 @@ function renderAdminPanel(container) {
           </select>
           <input type="number" min="1" name="episodeNo" required placeholder="当前集号" />
           <input type="number" min="1" name="newEpisodeNo" required placeholder="新集号" />
-          <input name="videoUrl" required placeholder="新播放 URL" />
+          <input name="videoUrl" required placeholder="新播放URL" />
           <button type="submit">修改</button>
         </form>
       </section>
