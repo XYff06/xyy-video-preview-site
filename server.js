@@ -250,24 +250,32 @@ const server = http.createServer(async (req, res) => {
     const titleName = parsePathParams(url.pathname, '/api/titles/');
     if (titleName !== null && req.method === 'PATCH') {
       const body = await readBody(req);
-      if (!validateNonEmptyString(body.newName)) {
-        sendJson(res, 400, { message: 'newName 不能为空' });
+      if (!validateNonEmptyString(body.newName) || !validateNonEmptyString(body.poster) || !Array.isArray(body.tags)) {
+        sendJson(res, 400, { message: 'newName、poster、tags 参数不完整' });
         return;
       }
       const newName = body.newName.trim();
+      const poster = body.poster.trim();
+      const tags = body.tags.filter(validateNonEmptyString).map((s) => s.trim());
+      if (!tags.length) {
+        sendJson(res, 400, { message: 'tags 至少需要一个标签' });
+        return;
+      }
       const records = getIngestRecords();
       const hasTitle = records.some((record) => record.name === titleName);
       if (!hasTitle) {
         sendJson(res, 404, { message: '漫剧不存在' });
         return;
       }
-      if (records.some((record) => record.name === newName)) {
+      if (records.some((record) => record.name === newName && record.name !== titleName)) {
         sendJson(res, 409, { message: '目标名称已存在' });
         return;
       }
       records.forEach((record) => {
         if (record.name === titleName) {
           record.name = newName;
+          record.poster = poster;
+          record.tags = [...tags];
           record.updatedAt = new Date().toISOString();
           if (!record.videoUrl || record.videoUrl.includes(encodeURIComponent(titleName))) {
             record.videoUrl = toVideoUrl(newName, record.episode);
@@ -275,7 +283,7 @@ const server = http.createServer(async (req, res) => {
         }
       });
       saveIngestRecords(records);
-      sendJson(res, 200, { message: '漫剧改名成功' });
+      sendJson(res, 200, { message: '漫剧信息修改成功' });
       return;
     }
 
