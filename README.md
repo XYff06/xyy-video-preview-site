@@ -31,7 +31,7 @@
    - `DELETE /api/titles/:titleName`
    - `PATCH /api/episodes`
 
-> 当前管理操作会直接更新 `data/ingest-records.json`，便于本地演示。生产环境建议替换为数据库。
+> 当前后端已改为 PostgreSQL 持久化存储。
 
 ## 本地运行
 
@@ -61,3 +61,40 @@ node server.js
 
 - 示例入库数据：`data/ingest-records.json`
 - 推荐 PostgreSQL 建表脚本：`db/schema.sql`
+
+
+## PostgreSQL 初始化
+
+1. 进入 psql：
+
+```bash
+psql -U postgres
+```
+
+2. 创建数据库：
+
+```sql
+CREATE DATABASE video_preview WITH ENCODING = 'UTF8';
+```
+
+3. 连接数据库：
+
+```sql
+\c video_preview
+```
+
+4. 执行建表脚本：
+
+```sql
+\i db/schema.sql
+```
+
+5. 配置环境变量（可选，默认即本地 postgres/video_preview）：
+
+```bash
+export PGHOST=127.0.0.1
+export PGPORT=5432
+export PGUSER=postgres
+export PGPASSWORD=你的密码
+export PGDATABASE=video_preview
+```
