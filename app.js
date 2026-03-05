@@ -808,6 +808,9 @@ function renderAdminPanel(container) {
 
       try {
         await apiFetch('/api/episodes', { method: 'POST', body: JSON.stringify(payload) });
+        if (currentPathName() === payload.titleName) {
+          state.selectedEpisode = payload.episodeNo;
+        }
         state.flashMessage = '剧集新增成功';
         await loadSeries();
       } catch (error) {
