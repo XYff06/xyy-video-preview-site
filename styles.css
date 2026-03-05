@@ -148,6 +148,33 @@ body { margin: 0; background: var(--bg); color: var(--text); }
   padding: 14px;
 }
 
+
+.action-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.action-tab-btn {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8f9fc;
+  height: 36px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.action-tab-btn.active {
+  border-color: var(--brand);
+  background: #edf5ff;
+  color: var(--brand);
+}
+
+.action-panel.hidden {
+  display: none;
+}
+
 .inline-form, .stack-form { display: flex; gap: 10px; margin-bottom: 12px; }
 .stack-form { flex-direction: column; max-width: 460px; }
 .inline-form input, .stack-form input, .stack-form select, .inline-form select {
@@ -173,4 +200,5 @@ body { margin: 0; background: var(--bg); color: var(--text); }
   .episode-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .poster-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
   .admin-modal-tabs { grid-template-columns: 1fr; }
+  .action-tabs { grid-template-columns: 1fr; }
 }
