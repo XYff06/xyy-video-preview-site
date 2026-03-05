@@ -58,6 +58,64 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+function getEpisodeOptionsByTitle(titleName) {
+  const target = state.allSeries.find((series) => series.name === titleName);
+  if (!target) return [];
+  return [...target.episodes].sort((a, b) => a.episode - b.episode);
+}
+
+function getTagMultiSelectHtml(fieldName, tags, selectedTags = []) {
+  if (!tags.length) {
+    return '<div class="multi-select-empty">暂无可选标签</div>';
+  }
+
+  const selected = new Set(selectedTags);
+  const selectedText = selected.size
+    ? [...selected].map((tag) => escapeHtml(tag)).join('、')
+    : '选择标签（可多选）';
+
+  return `
+    <details class="multi-select" data-multi-select>
+      <summary class="multi-select-summary" data-multi-summary>${selectedText}</summary>
+      <div class="multi-select-list">
+        ${tags.map((tag) => `
+          <label class="multi-select-item">
+            <input type="checkbox" name="${fieldName}" value="${escapeHtml(tag)}" ${selected.has(tag) ? 'checked' : ''} />
+            <span>${escapeHtml(tag)}</span>
+          </label>
+        `).join('')}
+      </div>
+    </details>
+  `;
+}
+
+function bindMultiSelectSummary(scope) {
+  scope.querySelectorAll('[data-multi-select]').forEach((multiSelect) => {
+    const summary = multiSelect.querySelector('[data-multi-summary]');
+    if (!summary) return;
+
+    const updateSummary = () => {
+      const checked = [...multiSelect.querySelectorAll('input[type="checkbox"]:checked')].map((input) => input.value);
+      summary.textContent = checked.length ? checked.join('、') : '选择标签（可多选）';
+    };
+
+    multiSelect.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+      if (input.dataset.summaryBound === '1') return;
+      input.addEventListener('change', updateSummary);
+      input.dataset.summaryBound = '1';
+    });
+
+    updateSummary();
+  });
+}
+
+function fillEpisodeSelectByTitle(titleSelect, episodeSelect, placeholderText) {
+  const episodes = getEpisodeOptionsByTitle(titleSelect.value);
+  episodeSelect.innerHTML = `<option value="">${placeholderText}</option>${episodes
+    .map((episode) => `<option value="${episode.episode}">第${episode.episode}集</option>`)
+    .join('')}`;
+}
+
 function getFlashHtml() {
   if (!state.flashMessage) return '';
   return `<div class="flash-msg">${state.flashMessage}</div>`;
@@ -361,11 +419,7 @@ function renderAdminPanel(container) {
           <form id="title-create-form" class="stack-form">
             <input name="name" required placeholder="漫剧名" />
             <input name="poster" required placeholder="海报URL" />
-            <select name="tags" multiple required>
-              ${tags.length
-                ? `<option value="" disabled>选择标签（可多选）</option>${tags.map((tag) => `<option value="${escapeHtml(tag)}">${escapeHtml(tag)}</option>`).join('')}`
-                : '<option value="" disabled>暂无可选标签</option>'}
-            </select>
+            ${getTagMultiSelectHtml('tags', tags)}
             <button type="submit">新增</button>
           </form>
         </section>
@@ -378,11 +432,7 @@ function renderAdminPanel(container) {
             </select>
             <input name="newName" required placeholder="漫剧名" />
             <input name="newPoster" required placeholder="海报URL" />
-            <select name="newTags" multiple required>
-              ${tags.length
-                ? `<option value="" disabled>选择标签（可多选）</option>${tags.map((tag) => `<option value="${escapeHtml(tag)}">${escapeHtml(tag)}</option>`).join('')}`
-                : '<option value="" disabled>暂无可选标签</option>'}
-            </select>
+            ${getTagMultiSelectHtml('newTags', tags)}
             <button type="submit">修改</button>
           </form>
         </section>
@@ -406,6 +456,8 @@ function renderAdminPanel(container) {
       };
     });
 
+    bindMultiSelectSummary(container);
+
     const titleCreateForm = document.getElementById('title-create-form');
     if (titleCreateForm) {
       titleCreateForm.onsubmit = async (event) => {
@@ -417,6 +469,11 @@ function renderAdminPanel(container) {
           .getAll('tags')
           .map((tag) => String(tag).trim())
           .filter(Boolean);
+        if (titleTags.length === 0) {
+          state.flashMessage = '请至少选择一个标签';
+          render();
+          return;
+        }
         try {
           await apiFetch('/api/titles', { method: 'POST', body: JSON.stringify({ name, poster, tags: titleTags }) });
           state.flashMessage = `漫剧「${name}」已创建`;
@@ -433,21 +490,23 @@ function renderAdminPanel(container) {
       const titleSelect = titleRenameForm.elements.namedItem('name');
       const newNameInput = titleRenameForm.elements.namedItem('newName');
       const newPosterInput = titleRenameForm.elements.namedItem('newPoster');
-      const newTagsSelect = titleRenameForm.elements.namedItem('newTags');
 
       const fillTitleEditFields = (titleName) => {
         const targetSeries = state.allSeries.find((series) => series.name === titleName);
         if (!targetSeries) return;
         newNameInput.value = targetSeries.name;
         newPosterInput.value = targetSeries.poster;
-        [...newTagsSelect.options].forEach((option) => {
-          option.selected = targetSeries.tags.has(option.value);
+        titleRenameForm.querySelectorAll('input[name="newTags"]').forEach((checkbox) => {
+          checkbox.checked = targetSeries.tags.has(checkbox.value);
         });
+        bindMultiSelectSummary(titleRenameForm);
       };
 
       titleSelect.onchange = () => {
         fillTitleEditFields(titleSelect.value);
       };
+
+      fillTitleEditFields(titleSelect.value);
 
       titleRenameForm.onsubmit = async (event) => {
         event.preventDefault();
@@ -522,7 +581,9 @@ function renderAdminPanel(container) {
             <option value="">选择漫剧</option>
             ${state.allSeries.map((series) => `<option value="${series.name}">${series.name}</option>`).join('')}
           </select>
-          <input type="number" min="1" name="episodeNo" required placeholder="当前集号" />
+          <select name="episodeNo" required>
+            <option value="">当前集号</option>
+          </select>
           <input type="number" min="1" name="newEpisodeNo" required placeholder="新集号" />
           <input name="videoUrl" required placeholder="新播放URL" />
           <button type="submit">修改</button>
@@ -535,7 +596,9 @@ function renderAdminPanel(container) {
             <option value="">选择漫剧</option>
             ${state.allSeries.map((series) => `<option value="${series.name}">${series.name}</option>`).join('')}
           </select>
-          <input type="number" min="1" name="episodeNo" required placeholder="集号" />
+          <select name="episodeNo" required>
+            <option value="">选择集号</option>
+          </select>
           <button type="submit">删除</button>
         </form>
       </section>
@@ -573,6 +636,16 @@ function renderAdminPanel(container) {
 
   const episodeUpdateForm = document.getElementById('episode-update-form');
   if (episodeUpdateForm) {
+    const titleSelect = episodeUpdateForm.elements.namedItem('titleName');
+    const episodeSelect = episodeUpdateForm.elements.namedItem('episodeNo');
+
+    const syncEpisodeOptions = () => {
+      fillEpisodeSelectByTitle(titleSelect, episodeSelect, '当前集号');
+    };
+
+    titleSelect.onchange = syncEpisodeOptions;
+    syncEpisodeOptions();
+
     episodeUpdateForm.onsubmit = async (event) => {
       event.preventDefault();
       const formData = new FormData(event.target);
@@ -582,6 +655,7 @@ function renderAdminPanel(container) {
         newEpisodeNo: Number(formData.get('newEpisodeNo')),
         videoUrl: String(formData.get('videoUrl') || '').trim()
       };
+      if (!payload.titleName || Number.isNaN(payload.episodeNo) || Number.isNaN(payload.newEpisodeNo)) return;
 
       try {
         await apiFetch('/api/episodes', { method: 'PATCH', body: JSON.stringify(payload) });
@@ -596,6 +670,16 @@ function renderAdminPanel(container) {
 
   const episodeDeleteForm = document.getElementById('episode-delete-form');
   if (episodeDeleteForm) {
+    const titleSelect = episodeDeleteForm.elements.namedItem('titleName');
+    const episodeSelect = episodeDeleteForm.elements.namedItem('episodeNo');
+
+    const syncEpisodeOptions = () => {
+      fillEpisodeSelectByTitle(titleSelect, episodeSelect, '选择集号');
+    };
+
+    titleSelect.onchange = syncEpisodeOptions;
+    syncEpisodeOptions();
+
     episodeDeleteForm.onsubmit = async (event) => {
       event.preventDefault();
       const formData = new FormData(event.target);
