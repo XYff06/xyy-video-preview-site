@@ -14,7 +14,7 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 
 .layout-shell {
   display: grid;
-  grid-template-columns: clamp(140px, 16vw, 240px) minmax(0, 1fr) clamp(90px, 8vw, 120px);
+  grid-template-columns: clamp(120px, 9vw, 175px) minmax(0, 1fr) clamp(90px, 5vw, 120px);
   width: 100%;
   min-height: 100vh;
 }
