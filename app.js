@@ -8,6 +8,7 @@ const state = {
   loading: true,
   error: null,
   activeAdminTab: 'tag',
+  adminModalOpen: false,
   flashMessage: ''
 };
 
@@ -50,6 +51,26 @@ function getFlashHtml() {
   return `<div class="flash-msg">${state.flashMessage}</div>`;
 }
 
+function getAdminModalHtml() {
+  if (!state.adminModalOpen) return '';
+  return `
+    <div class="modal-mask" id="admin-modal-mask">
+      <section class="admin-modal" role="dialog" aria-modal="true" aria-label="管理中心">
+        <header class="admin-modal-header">
+          <h3>管理中心</h3>
+          <button id="close-admin" class="icon-btn" type="button">✕</button>
+        </header>
+        <div class="admin-modal-tabs">
+          <button class="admin-nav-btn ${state.activeAdminTab === 'tag' ? 'active' : ''}" data-admin-tab="tag">标签管理</button>
+          <button class="admin-nav-btn ${state.activeAdminTab === 'title' ? 'active' : ''}" data-admin-tab="title">漫剧管理</button>
+          <button class="admin-nav-btn ${state.activeAdminTab === 'episode' ? 'active' : ''}" data-admin-tab="episode">内容管理</button>
+        </div>
+        <section id="admin-content"></section>
+      </section>
+    </div>
+  `;
+}
+
 function render() {
   const app = document.getElementById('app');
 
@@ -65,25 +86,43 @@ function render() {
 
   app.innerHTML = `
     <section class="layout-shell">
-      <aside class="admin-sidebar">
-        <button class="admin-nav-btn ${state.activeAdminTab === 'tag' ? 'active' : ''}" data-admin-tab="tag">标签管理</button>
-        <button class="admin-nav-btn ${state.activeAdminTab === 'title' ? 'active' : ''}" data-admin-tab="title">漫剧管理</button>
-        <button class="admin-nav-btn ${state.activeAdminTab === 'episode' ? 'active' : ''}" data-admin-tab="episode">内容管理</button>
-      </aside>
       <section class="content-shell">
+        <div class="toolbar-row">
+          <button id="open-admin" class="primary-btn" type="button">打开管理窗口</button>
+        </div>
         ${getFlashHtml()}
         <section id="page-content"></section>
-        <section id="admin-content"></section>
       </section>
     </section>
+    ${getAdminModalHtml()}
   `;
 
-  document.querySelectorAll('[data-admin-tab]').forEach((btn) => {
-    btn.onclick = () => {
-      state.activeAdminTab = btn.dataset.adminTab;
+  document.getElementById('open-admin').onclick = () => {
+    state.adminModalOpen = true;
+    render();
+  };
+
+  if (state.adminModalOpen) {
+    document.getElementById('close-admin').onclick = () => {
+      state.adminModalOpen = false;
       render();
     };
-  });
+
+    document.getElementById('admin-modal-mask').onclick = (event) => {
+      if (event.target.id !== 'admin-modal-mask') return;
+      state.adminModalOpen = false;
+      render();
+    };
+
+    document.querySelectorAll('[data-admin-tab]').forEach((btn) => {
+      btn.onclick = () => {
+        state.activeAdminTab = btn.dataset.adminTab;
+        render();
+      };
+    });
+
+    renderAdminPanel(document.getElementById('admin-content'));
+  }
 
   const pageContent = document.getElementById('page-content');
   const activeName = currentPathName();
@@ -98,8 +137,6 @@ function render() {
   } else {
     renderHome(pageContent);
   }
-
-  renderAdminPanel(document.getElementById('admin-content'));
 }
 
 function renderHome(container) {
@@ -187,19 +224,22 @@ function renderAdminPanel(container) {
       <section class="admin-panel">
         <h3>标签管理</h3>
         <form id="tag-create-form" class="inline-form">
-          <input name="tagName" required placeholder="新标签名" />
-          <button type="submit">新建标签</button>
+          <input name="tagName" required placeholder="新标签名称" />
+          <button type="submit">新增标签</button>
         </form>
-        <div class="admin-list">${tags
-          .map(
-            (tag) => `
-              <div class="admin-item">
-                <span>${tag}</span>
-                <button data-tag-rename="${tag}">改名</button>
-                <button data-tag-delete="${tag}" class="danger">删除</button>
-              </div>`
-          )
-          .join('')}</div>
+
+        <form id="tag-manage-form" class="inline-form">
+          <select name="tagName" required>
+            <option value="">选择标签</option>
+            ${tags.map((tag) => `<option value="${tag}">${tag}</option>`).join('')}
+          </select>
+          <select name="action" required>
+            <option value="rename">改名</option>
+            <option value="delete">删除</option>
+          </select>
+          <button type="submit">执行</button>
+        </form>
+        <p class="hint">通过下拉框选择要处理的标签，再执行改名或删除。</p>
       </section>
     `;
 
@@ -207,45 +247,46 @@ function renderAdminPanel(container) {
       event.preventDefault();
       const formData = new FormData(event.target);
       const tagName = String(formData.get('tagName') || '').trim();
-      if (!tagName) return;
       try {
         await apiFetch('/api/tags', { method: 'POST', body: JSON.stringify({ tagName }) });
-        state.flashMessage = `标签「${tagName}」已创建，请到漫剧管理里关联使用。`;
+        state.flashMessage = `标签「${tagName}」已创建`;
       } catch (error) {
         state.flashMessage = error.message;
       }
       render();
     };
 
-    container.querySelectorAll('[data-tag-rename]').forEach((btn) => {
-      btn.onclick = async () => {
-        const oldName = btn.dataset.tagRename;
-        const newTagName = prompt(`将标签“${oldName}”改名为：`, oldName);
-        if (!newTagName || newTagName.trim() === oldName) return;
-        try {
-          await apiFetch(`/api/tags/${encodeURIComponent(oldName)}`, { method: 'PATCH', body: JSON.stringify({ newTagName }) });
-          state.flashMessage = '标签改名成功';
-        } catch (error) {
-          state.flashMessage = error.message;
-        }
-        render();
-      };
-    });
+    document.getElementById('tag-manage-form').onsubmit = async (event) => {
+      event.preventDefault();
+      const formData = new FormData(event.target);
+      const tag = String(formData.get('tagName') || '').trim();
+      const action = String(formData.get('action') || 'rename');
+      if (!tag) return;
 
-    container.querySelectorAll('[data-tag-delete]').forEach((btn) => {
-      btn.onclick = async () => {
-        const tag = btn.dataset.tagDelete;
-        if (!confirm(`确认删除标签“${tag}”？会从所有漫剧里移除该标签。`)) return;
+      if (action === 'rename') {
+        const newTagName = prompt(`将标签“${tag}”改名为：`, tag);
+        if (!newTagName || newTagName.trim() === tag) return;
         try {
-          await apiFetch(`/api/tags/${encodeURIComponent(tag)}`, { method: 'DELETE' });
-          state.flashMessage = '标签删除成功';
-          if (state.selectedTag === tag) state.selectedTag = null;
+          await apiFetch(`/api/tags/${encodeURIComponent(tag)}`, { method: 'PATCH', body: JSON.stringify({ newTagName }) });
+          state.flashMessage = '标签改名成功';
+          if (state.selectedTag === tag) state.selectedTag = newTagName.trim();
         } catch (error) {
           state.flashMessage = error.message;
         }
         render();
-      };
-    });
+        return;
+      }
+
+      if (!confirm(`确认删除标签“${tag}”？会从所有漫剧里移除该标签。`)) return;
+      try {
+        await apiFetch(`/api/tags/${encodeURIComponent(tag)}`, { method: 'DELETE' });
+        state.flashMessage = '标签删除成功';
+        if (state.selectedTag === tag) state.selectedTag = null;
+      } catch (error) {
+        state.flashMessage = error.message;
+      }
+      render();
+    };
     return;
   }
 
@@ -261,16 +302,19 @@ function renderAdminPanel(container) {
           <button type="submit">新增漫剧</button>
         </form>
         <p class="hint">可用标签：${tags.join('、') || '暂无'}</p>
-        <div class="admin-list">${state.allSeries
-          .map(
-            (series) => `
-              <div class="admin-item">
-                <span>${series.name}</span>
-                <button data-title-rename="${series.name}">改名</button>
-                <button data-title-delete="${series.name}" class="danger">删除</button>
-              </div>`
-          )
-          .join('')}</div>
+
+        <form id="title-manage-form" class="inline-form">
+          <select name="name" required>
+            <option value="">选择漫剧</option>
+            ${state.allSeries.map((series) => `<option value="${series.name}">${series.name}</option>`).join('')}
+          </select>
+          <select name="action" required>
+            <option value="rename">改名</option>
+            <option value="delete">删除</option>
+          </select>
+          <button type="submit">执行</button>
+        </form>
+        <p class="hint">通过下拉框选择要处理的漫剧，再执行改名或删除。</p>
       </section>
     `;
 
@@ -294,9 +338,14 @@ function renderAdminPanel(container) {
       }
     };
 
-    container.querySelectorAll('[data-title-rename]').forEach((btn) => {
-      btn.onclick = async () => {
-        const oldName = btn.dataset.titleRename;
+    document.getElementById('title-manage-form').onsubmit = async (event) => {
+      event.preventDefault();
+      const formData = new FormData(event.target);
+      const oldName = String(formData.get('name') || '').trim();
+      const action = String(formData.get('action') || 'rename');
+      if (!oldName) return;
+
+      if (action === 'rename') {
         const newName = prompt(`将漫剧“${oldName}”改名为：`, oldName);
         if (!newName || newName.trim() === oldName) return;
         try {
@@ -308,24 +357,20 @@ function renderAdminPanel(container) {
           state.flashMessage = error.message;
           render();
         }
-      };
-    });
+        return;
+      }
 
-    container.querySelectorAll('[data-title-delete]').forEach((btn) => {
-      btn.onclick = async () => {
-        const name = btn.dataset.titleDelete;
-        if (!confirm(`确认删除漫剧“${name}”？该漫剧下全部剧集会删除。`)) return;
-        try {
-          await apiFetch(`/api/titles/${encodeURIComponent(name)}`, { method: 'DELETE' });
-          state.flashMessage = '漫剧删除成功';
-          if (currentPathName() === name) history.replaceState({}, '', '/');
-          await loadSeries();
-        } catch (error) {
-          state.flashMessage = error.message;
-          render();
-        }
-      };
-    });
+      if (!confirm(`确认删除漫剧“${oldName}”？该漫剧下全部剧集会删除。`)) return;
+      try {
+        await apiFetch(`/api/titles/${encodeURIComponent(oldName)}`, { method: 'DELETE' });
+        state.flashMessage = '漫剧删除成功';
+        if (currentPathName() === oldName) history.replaceState({}, '', '/');
+        await loadSeries();
+      } catch (error) {
+        state.flashMessage = error.message;
+        render();
+      }
+    };
     return;
   }
 

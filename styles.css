@@ -12,34 +12,25 @@
 body { margin: 0; background: var(--bg); color: var(--text); }
 .app { width: min(1400px, 96%); margin: 0 auto; padding: 22px 16px 40px; }
 
-.layout-shell {
-  display: grid;
-  grid-template-columns: 180px 1fr;
-  gap: 16px;
-}
+.layout-shell { display: block; }
+.content-shell { min-width: 0; }
 
-.admin-sidebar {
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 12px;
+.toolbar-row {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-  position: sticky;
-  top: 12px;
-  align-self: start;
+  justify-content: flex-end;
+  margin-bottom: 12px;
 }
 
-.admin-nav-btn {
-  border: 1px solid var(--line);
+.primary-btn {
+  border: 1px solid var(--brand);
   border-radius: 10px;
-  padding: 10px;
-  background: #f8f9fc;
-  cursor: pointer;
+  background: var(--brand);
+  color: #fff;
   font-weight: 600;
+  height: 40px;
+  padding: 0 16px;
+  cursor: pointer;
 }
-.admin-nav-btn.active { background: var(--brand); color: #fff; border-color: var(--brand); }
 
 .flash-msg {
   margin-bottom: 12px;
@@ -49,8 +40,6 @@ body { margin: 0; background: var(--bg); color: var(--text); }
   border-radius: 10px;
   font-size: 13px;
 }
-
-.content-shell { min-width: 0; }
 
 .top-categories {
   display: grid;
@@ -96,8 +85,63 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 #player { width: 100%; aspect-ratio: 16 / 7; display: block; background: #000; }
 #player-meta { margin: 8px 0 0; color: #677081; font-size: 12px; white-space: pre-line; line-height: 1.6; }
 
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 23, 41, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  z-index: 20;
+}
+
+.admin-modal {
+  width: min(860px, 96vw);
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  max-height: 92vh;
+  overflow: auto;
+}
+
+.admin-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.icon-btn {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  background: #f8fafc;
+}
+
+.admin-modal-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px 16px 0;
+}
+
+.admin-nav-btn {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  background: #f8f9fc;
+  cursor: pointer;
+  font-weight: 600;
+}
+.admin-nav-btn.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+
 .admin-panel {
-  margin-top: 16px;
+  margin: 12px 16px 16px;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: #fff;
@@ -106,29 +150,27 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 
 .inline-form, .stack-form { display: flex; gap: 10px; margin-bottom: 12px; }
 .stack-form { flex-direction: column; max-width: 460px; }
-.inline-form input, .stack-form input, .stack-form select {
+.inline-form input, .stack-form input, .stack-form select, .inline-form select {
   border: 1px solid var(--line);
   border-radius: 8px;
   height: 38px;
   padding: 0 10px;
+  background: #fff;
 }
-.inline-form button, .stack-form button, .admin-item button {
+.inline-form button, .stack-form button {
   border: 1px solid var(--line);
   border-radius: 8px;
   height: 38px;
   background: #f8fafc;
   cursor: pointer;
+  padding: 0 12px;
 }
 
-.admin-list { display: grid; gap: 8px; }
-.admin-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; background: #f7f9fc; border-radius: 8px; }
-.admin-item .danger { color: var(--danger); border-color: #f2cccc; }
 .hint { color: var(--muted); font-size: 12px; margin-top: -4px; }
 
 @media (max-width: 1080px) {
-  .layout-shell { grid-template-columns: 1fr; }
-  .admin-sidebar { position: static; flex-direction: row; }
   .top-categories { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .episode-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .poster-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+  .admin-modal-tabs { grid-template-columns: 1fr; }
 }
