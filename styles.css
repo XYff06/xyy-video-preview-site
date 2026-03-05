@@ -92,6 +92,69 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 .category-pill:hover { border-color: var(--brand); background: #fff; color: #1d3557; font-weight: 700; }
 .category-pill.active { background: var(--brand); color: #fff; border-color: var(--brand); font-weight: 700; }
 
+
+.home-search-bar {
+  margin-bottom: 12px;
+}
+
+.search-form {
+  display: flex;
+  gap: 10px;
+}
+
+.global-search {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  height: 42px;
+  padding: 0 12px;
+  font-size: 14px;
+}
+
+.global-search:focus {
+  outline: 2px solid rgba(11, 99, 200, 0.2);
+  border-color: var(--brand);
+}
+
+.search-btn {
+  height: 42px;
+  min-width: 84px;
+  padding: 0 18px;
+}
+
+.empty-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--muted);
+  margin: 18px 0;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.page-btn {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  height: 34px;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.page-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.page-meta {
+  color: #5a6270;
+  font-size: 13px;
+}
 .poster-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
 .poster-card { border-radius: 18px; border: 1px solid var(--line); padding: 10px; background: #f2f3f5; cursor: pointer; transition: all 0.2s ease; }
 .poster-card:hover { transform: translateY(-2px); box-shadow: 0 7px 20px rgba(0, 0, 0, 0.1); }
