@@ -48,6 +48,15 @@ function getAllTags() {
   return [...new Set(state.allSeries.flatMap((item) => [...item.tags]))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function getFlashHtml() {
   if (!state.flashMessage) return '';
   return `<div class="flash-msg">${state.flashMessage}</div>`;
@@ -351,20 +360,28 @@ function renderAdminPanel(container) {
           <form id="title-create-form" class="stack-form">
             <input name="name" required placeholder="漫剧名" />
             <input name="poster" required placeholder="海报URL" />
-            <select name="tags" multiple>
-              ${tags.length ? tags.map((tag) => `<option value="${tag}">${tag}</option>`).join('') : '<option value="" disabled>暂无可选标签</option>'}
+            <select name="tags" multiple required>
+              ${tags.length
+                ? `<option value="" disabled>选择标签（可多选）</option>${tags.map((tag) => `<option value="${escapeHtml(tag)}">${escapeHtml(tag)}</option>`).join('')}`
+                : '<option value="" disabled>暂无可选标签</option>'}
             </select>
             <button type="submit">新增</button>
           </form>
         </section>
 
         <section class="action-panel ${state.activeTitleAction === 'rename' ? '' : 'hidden'}">
-          <form id="title-rename-form" class="inline-form">
+          <form id="title-rename-form" class="stack-form">
             <select name="name" required>
               <option value="">选择漫剧</option>
               ${state.allSeries.map((series) => `<option value="${series.name}">${series.name}</option>`).join('')}
             </select>
-            <input name="newName" required placeholder="新漫剧名" />
+            <input name="newName" required placeholder="漫剧名" />
+            <input name="newPoster" required placeholder="海报URL" />
+            <select name="newTags" multiple required>
+              ${tags.length
+                ? `<option value="" disabled>选择标签（可多选）</option>${tags.map((tag) => `<option value="${escapeHtml(tag)}">${escapeHtml(tag)}</option>`).join('')}`
+                : '<option value="" disabled>暂无可选标签</option>'}
+            </select>
             <button type="submit">修改</button>
           </form>
         </section>
@@ -412,16 +429,40 @@ function renderAdminPanel(container) {
 
     const titleRenameForm = document.getElementById('title-rename-form');
     if (titleRenameForm) {
+      const titleSelect = titleRenameForm.elements.namedItem('name');
+      const newNameInput = titleRenameForm.elements.namedItem('newName');
+      const newPosterInput = titleRenameForm.elements.namedItem('newPoster');
+      const newTagsSelect = titleRenameForm.elements.namedItem('newTags');
+
+      const fillTitleEditFields = (titleName) => {
+        const targetSeries = state.allSeries.find((series) => series.name === titleName);
+        if (!targetSeries) return;
+        newNameInput.value = targetSeries.name;
+        newPosterInput.value = targetSeries.poster;
+        [...newTagsSelect.options].forEach((option) => {
+          option.selected = targetSeries.tags.has(option.value);
+        });
+      };
+
+      titleSelect.onchange = () => {
+        fillTitleEditFields(titleSelect.value);
+      };
+
       titleRenameForm.onsubmit = async (event) => {
         event.preventDefault();
         const formData = new FormData(event.target);
         const oldName = String(formData.get('name') || '').trim();
         const newName = String(formData.get('newName') || '').trim();
-        if (!oldName || !newName || newName === oldName) return;
+        const newPoster = String(formData.get('newPoster') || '').trim();
+        const newTags = formData
+          .getAll('newTags')
+          .map((tag) => String(tag).trim())
+          .filter(Boolean);
+        if (!oldName || !newName || !newPoster || newTags.length === 0) return;
 
         try {
-          await apiFetch(`/api/titles/${encodeURIComponent(oldName)}`, { method: 'PATCH', body: JSON.stringify({ newName }) });
-          state.flashMessage = '漫剧改名成功';
+          await apiFetch(`/api/titles/${encodeURIComponent(oldName)}`, { method: 'PATCH', body: JSON.stringify({ newName, poster: newPoster, tags: newTags }) });
+          state.flashMessage = '漫剧信息修改成功';
           if (currentPathName() === oldName) history.replaceState({}, '', `/${encodeURIComponent(newName)}`);
           await loadSeries();
         } catch (error) {
