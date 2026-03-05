@@ -290,6 +290,7 @@ function renderHome(container) {
   searchBar.innerHTML = `
     <form id="global-search-form" class="search-form">
       <input id="global-search" class="global-search" type="search" placeholder="全局搜索：输入漫剧名称" value="${escapeHtml(state.searchQuery)}" />
+      <button type="submit" class="primary-btn search-btn">搜索</button>
       <select id="global-sort" class="global-sort" aria-label="排序依据">
         <option value="updated_desc" ${state.sortBy === 'updated_desc' ? 'selected' : ''}>最后更新时间（倒序）</option>
         <option value="updated_asc" ${state.sortBy === 'updated_asc' ? 'selected' : ''}>最后更新时间（顺序）</option>
@@ -298,7 +299,6 @@ function renderHome(container) {
         <option value="name_asc" ${state.sortBy === 'name_asc' ? 'selected' : ''}>名称（顺序）</option>
         <option value="name_desc" ${state.sortBy === 'name_desc' ? 'selected' : ''}>名称（倒序）</option>
       </select>
-      <button type="submit" class="primary-btn search-btn">搜索</button>
     </form>
   `;
   homePage.insertBefore(searchBar, grid);
@@ -372,6 +372,10 @@ function renderHome(container) {
       card.innerHTML = `
         <div class="poster" style="background-image:url('${series.poster}')"></div>
         <p class="poster-title">${series.name}</p>
+        <p class="poster-meta">最大集数：${maxEpisode}</p>
+        <p class="poster-meta">总集数：${totalEpisodes}</p>
+        <p class="poster-meta">最后更新时间：${fmt(series.updatedAt)}</p>
+        <p class="poster-meta">入库时间：${fmt(series.firstIngestedAt)}</p>
       `;
       card.onclick = () => {
         history.pushState({}, '', `/${encodeURIComponent(series.name)}`);
@@ -495,14 +499,6 @@ function renderDetail(container, series) {
   player.src = selected.videoUrl;
   playerMeta.innerHTML = `
     <p class="player-meta-title">${escapeHtml(series.name)}</p>
-    <p class="player-meta-time-row">
-      <span>最大集数：${escapeHtml(maxEpisode || 0)}</span>
-      <span>总集数：${escapeHtml(totalEpisodes)}</span>
-    </p>
-    <p class="player-meta-time-row">
-      <span>最后更新时间：${escapeHtml(fmt(series.updatedAt))}</span>
-      <span>入库时间：${escapeHtml(fmt(series.firstIngestedAt))}</span>
-    </p>
     <p class="player-meta-time-row">
       <span>首次入库：${escapeHtml(fmt(selected.firstIngestedAt))}</span>
       <span>最近更新：${escapeHtml(fmt(selected.updatedAt))}</span>

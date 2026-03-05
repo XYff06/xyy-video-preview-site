@@ -147,12 +147,13 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 
 .global-sort {
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 0;
   height: 50px;
   padding: 0 14px;
   font-size: 15px;
   color: #2a3040;
   background: #fff;
+  min-width: 250px;
 }
 
 .global-sort:focus {
