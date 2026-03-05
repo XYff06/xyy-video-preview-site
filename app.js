@@ -461,12 +461,22 @@ function renderDetail(container, series) {
 
   if (!selected) {
     player.removeAttribute('src');
-    playerMeta.textContent = `${series.name}\n暂无剧集，请先在管理后台新增内容`;
+    playerMeta.innerHTML = `
+      <p class="player-meta-title">${escapeHtml(series.name)}</p>
+      <p class="player-meta-empty">暂无内容</p>
+    `;
     return;
   }
 
   player.src = selected.videoUrl;
-  playerMeta.textContent = `${series.name}\n第${selected.episode}集\n首次入库：${fmt(selected.firstIngestedAt)}\n最近更新：${fmt(selected.updatedAt)}\n${selected.videoUrl}`;
+  playerMeta.innerHTML = `
+    <p class="player-meta-title">${escapeHtml(series.name)}</p>
+    <p class="player-meta-time-row">
+      <span>首次入库：${escapeHtml(fmt(selected.firstIngestedAt))}</span>
+      <span>最近更新：${escapeHtml(fmt(selected.updatedAt))}</span>
+    </p>
+    <p class="player-meta-url">${escapeHtml(selected.videoUrl)}</p>
+  `;
 }
 
 function renderAdminPanel(container) {
