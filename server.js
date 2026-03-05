@@ -335,6 +335,76 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (url.pathname === '/api/episodes' && req.method === 'POST') {
+      const body = await readBody(req);
+      const { titleName: episodeTitleName, episodeNo, videoUrl } = body;
+      if (!validateNonEmptyString(episodeTitleName) || Number.isNaN(Number(episodeNo)) || !validateNonEmptyString(videoUrl)) {
+        sendJson(res, 400, { message: '参数不完整' });
+        return;
+      }
+
+      const targetNo = Number(episodeNo);
+      if (targetNo <= 0) {
+        sendJson(res, 400, { message: '集号必须大于0' });
+        return;
+      }
+
+      const records = getIngestRecords();
+      const hasTitle = records.some((record) => record.name === episodeTitleName);
+      if (!hasTitle) {
+        sendJson(res, 404, { message: '漫剧不存在' });
+        return;
+      }
+
+      const duplicated = records.find((record) => record.name === episodeTitleName && record.episode === targetNo);
+      if (duplicated) {
+        sendJson(res, 409, { message: '目标集号已存在' });
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const poster = records.find((record) => record.name === episodeTitleName)?.poster || '';
+      const tags = records.find((record) => record.name === episodeTitleName)?.tags || [];
+      records.push({
+        name: episodeTitleName,
+        episode: targetNo,
+        tags,
+        firstIngestedAt: now,
+        updatedAt: now,
+        poster,
+        videoUrl: videoUrl.trim()
+      });
+      saveIngestRecords(records);
+      sendJson(res, 201, { message: '剧集新增成功' });
+      return;
+    }
+
+    if (url.pathname === '/api/episodes' && req.method === 'DELETE') {
+      const body = await readBody(req);
+      const { titleName: episodeTitleName, episodeNo } = body;
+      if (!validateNonEmptyString(episodeTitleName) || Number.isNaN(Number(episodeNo))) {
+        sendJson(res, 400, { message: '参数不完整' });
+        return;
+      }
+
+      const targetNo = Number(episodeNo);
+      if (targetNo <= 0) {
+        sendJson(res, 400, { message: '集号必须大于0' });
+        return;
+      }
+
+      const records = getIngestRecords();
+      const next = records.filter((record) => !(record.name === episodeTitleName && record.episode === targetNo));
+      if (next.length === records.length) {
+        sendJson(res, 404, { message: '剧集不存在' });
+        return;
+      }
+
+      saveIngestRecords(next);
+      sendJson(res, 200, { message: '剧集删除成功' });
+      return;
+    }
+
     if (req.method === 'GET') {
       serveStatic(url.pathname, res);
       return;
