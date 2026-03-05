@@ -11,7 +11,7 @@ const state = {
   homeTotal: 0,
   homeLoading: false,
   homeError: null,
-  selectedEpisode: 1,
+  selectedEpisode: null,
   tagExpanded: false,
   loading: true,
   error: null,
@@ -357,7 +357,7 @@ function renderHome(container) {
       `;
       card.onclick = () => {
         history.pushState({}, '', `/${encodeURIComponent(series.name)}`);
-        state.selectedEpisode = 1;
+        state.selectedEpisode = series.episodes[0]?.episode ?? null;
         render();
       };
       grid.appendChild(card);
@@ -434,6 +434,10 @@ function renderHome(container) {
 }
 
 function renderDetail(container, series) {
+  if (series.episodes.length > 0 && !series.episodes.some((ep) => ep.episode === state.selectedEpisode)) {
+    state.selectedEpisode = series.episodes[0].episode;
+  }
+
   const topRowLeft = document.getElementById('top-row-left');
   topRowLeft.innerHTML = '<button id="back-home" class="back-btn">⬅ 首页</button>';
   container.innerHTML = document.getElementById('detail-template').innerHTML;
