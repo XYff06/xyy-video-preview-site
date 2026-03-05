@@ -14,7 +14,7 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 
 .layout-shell {
   display: grid;
-  grid-template-columns: 7% minmax(0, 1fr) 7%;
+  grid-template-columns: clamp(140px, 16vw, 240px) minmax(0, 1fr) clamp(90px, 8vw, 120px);
   width: 100%;
   min-height: 100vh;
 }
@@ -60,25 +60,25 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 }
 
 .flash-msg {
-  margin-bottom: 12px;
+  margin: 0 auto 12px;
   border: 1px solid #cfe3ff;
   background: #edf5ff;
   padding: 8px 10px;
   border-radius: 10px;
   font-size: 13px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
-  width: 50%;
+  width: min(50%, 560px);
   min-width: 260px;
-  max-width: 560px;
 }
 
 .flash-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .flash-close {
@@ -95,11 +95,12 @@ body { margin: 0; background: var(--bg); color: var(--text); }
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
+  width: 100%;
 }
 
 .category-pill {
   width: 100%;
-  height: 42px;
+  min-height: 42px;
   border-radius: 999px;
   border: 1.5px solid transparent;
   background: #f8f8f8;
@@ -110,6 +111,11 @@ body { margin: 0; background: var(--bg); color: var(--text); }
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  text-align: center;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.25;
+  padding: 8px 12px;
   transition: all 0.2s ease;
 }
 .category-pill:hover { border-color: var(--brand); background: #fff; color: #1d3557; font-weight: 700; }
@@ -475,5 +481,10 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 
   .content-shell {
     padding-top: 12px;
+  }
+
+  .flash-msg {
+    width: 100%;
+    min-width: 0;
   }
 }
