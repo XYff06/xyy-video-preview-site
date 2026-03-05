@@ -640,7 +640,7 @@ function renderAdminPanel(container) {
     const episodeSelect = episodeUpdateForm.elements.namedItem('episodeNo');
 
     const syncEpisodeOptions = () => {
-      fillEpisodeSelectByTitle(titleSelect, episodeSelect, '当前集号');
+      fillEpisodeSelectByTitle(titleSelect, episodeSelect, '选择集号');
     };
 
     titleSelect.onchange = syncEpisodeOptions;
