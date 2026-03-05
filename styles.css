@@ -215,7 +215,15 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 }
 
 .inline-form, .stack-form { display: flex; gap: 10px; margin-bottom: 12px; }
+.inline-form {
+  width: 100%;
+  align-items: center;
+}
 .stack-form { flex-direction: column; width: 100%; }
+.inline-form input, .inline-form select {
+  flex: 1;
+  min-width: 0;
+}
 .inline-form input, .stack-form input, .stack-form select, .inline-form select {
   border: 1px solid var(--line);
   border-radius: 8px;
