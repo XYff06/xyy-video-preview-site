@@ -15,10 +15,17 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 .layout-shell { display: block; }
 .content-shell { min-width: 0; }
 
-.toolbar-row {
+.top-row {
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: 12px;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0;
+  gap: 12px;
+}
+
+#top-row-left {
+  flex: 1;
+  min-width: 0;
 }
 
 .primary-btn {
@@ -30,6 +37,12 @@ body { margin: 0; background: var(--bg); color: var(--text); }
   height: 40px;
   padding: 0 16px;
   cursor: pointer;
+}
+
+.manage-btn {
+  width: 56px;
+  height: 42px;
+  padding: 0;
 }
 
 .flash-msg {
@@ -109,9 +122,15 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 .admin-modal-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   padding: 14px 16px;
   border-bottom: 1px solid var(--line);
+  position: relative;
+}
+
+.admin-modal-header h3 {
+  margin: 0;
+  text-align: center;
 }
 
 .icon-btn {
@@ -121,6 +140,8 @@ body { margin: 0; background: var(--bg); color: var(--text); }
   height: 32px;
   cursor: pointer;
   background: #f8fafc;
+  position: absolute;
+  right: 16px;
 }
 
 .admin-modal-tabs {
@@ -137,6 +158,7 @@ body { margin: 0; background: var(--bg); color: var(--text); }
   background: #f8f9fc;
   cursor: pointer;
   font-weight: 600;
+  text-align: center;
 }
 .admin-nav-btn.active { background: var(--brand); color: #fff; border-color: var(--brand); }
 
@@ -146,6 +168,10 @@ body { margin: 0; background: var(--bg); color: var(--text); }
   border-radius: 14px;
   background: #fff;
   padding: 14px;
+}
+
+.admin-panel h3 {
+  text-align: center;
 }
 
 
@@ -196,6 +222,8 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 .hint { color: var(--muted); font-size: 12px; margin-top: -4px; }
 
 @media (max-width: 1080px) {
+  .top-row { flex-direction: column; align-items: stretch; }
+  .manage-btn { width: 100%; }
   .top-categories { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .episode-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .poster-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
