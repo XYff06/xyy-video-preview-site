@@ -2,6 +2,7 @@ const fmt = (iso) => new Date(iso).toLocaleString('zh-CN', { hour12: false });
 
 const state = {
   allSeries: [],
+  allTags: [],
   selectedTag: null,
   searchQuery: '',
   currentPage: 1,
@@ -38,10 +39,18 @@ async function apiFetch(url, options = {}) {
   return payload;
 }
 
+async function loadTags() {
+  const payload = await apiFetch('/api/tags');
+  state.allTags = payload.data;
+}
+
 async function loadSeries() {
   try {
-    const payload = await apiFetch('/api/series');
-    state.allSeries = payload.data.map((item) => ({ ...item, tags: new Set(item.tags) }));
+    const [seriesPayload] = await Promise.all([
+      apiFetch('/api/series?page=1&pageSize=10000'),
+      loadTags()
+    ]);
+    state.allSeries = seriesPayload.data.map((item) => ({ ...item, tags: new Set(item.tags) }));
     state.loading = false;
     state.error = null;
   } catch (error) {
@@ -85,6 +94,7 @@ async function loadHomeSeries() {
 }
 
 function getAllTags() {
+  if (state.allTags.length) return [...state.allTags];
   return [...new Set(state.allSeries.flatMap((item) => [...item.tags]))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
 }
 
@@ -452,10 +462,11 @@ function renderAdminPanel(container) {
         try {
           await apiFetch('/api/tags', { method: 'POST', body: JSON.stringify({ tagName }) });
           state.flashMessage = `标签「${tagName}」已创建`;
+          await loadSeries();
         } catch (error) {
           state.flashMessage = error.message;
+          render();
         }
-        render();
       };
     }
 
@@ -472,10 +483,11 @@ function renderAdminPanel(container) {
           await apiFetch(`/api/tags/${encodeURIComponent(tag)}`, { method: 'PATCH', body: JSON.stringify({ newTagName }) });
           state.flashMessage = '标签改名成功';
           if (state.selectedTag === tag) state.selectedTag = newTagName;
+          await loadSeries();
         } catch (error) {
           state.flashMessage = error.message;
+          render();
         }
-        render();
       };
     }
 
@@ -492,10 +504,11 @@ function renderAdminPanel(container) {
           await apiFetch(`/api/tags/${encodeURIComponent(tag)}`, { method: 'DELETE' });
           state.flashMessage = '标签删除成功';
           if (state.selectedTag === tag) state.selectedTag = null;
+          await loadSeries();
         } catch (error) {
           state.flashMessage = error.message;
+          render();
         }
-        render();
       };
     }
     return;
