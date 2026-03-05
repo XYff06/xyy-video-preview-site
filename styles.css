@@ -239,7 +239,37 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 
 .player-wrap { border: 1px solid var(--line); border-radius: 16px; background: #fff; padding: 12px; }
 #player { width: 100%; aspect-ratio: 16 / 7; display: block; background: #000; }
-#player-meta { margin: 8px 0 0; color: #677081; font-size: 12px; white-space: pre-line; line-height: 1.6; }
+#player-meta {
+  margin: 10px 0 0;
+  color: #677081;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.player-meta-title {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.2;
+  color: #3f4a5c;
+}
+
+.player-meta-empty {
+  margin: 6px 0 0;
+  color: #8f96a3;
+}
+
+.player-meta-time-row {
+  margin: 6px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+}
+
+.player-meta-url {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 
 .modal-mask {
   position: fixed;
