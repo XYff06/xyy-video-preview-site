@@ -374,10 +374,7 @@ function renderHome(container) {
       card.innerHTML = `
         <div class="poster" style="background-image:url('${series.poster}')"></div>
         <p class="poster-title">${escapeHtml(series.name)}</p>
-        <p class="poster-meta">最大集数：${maxEpisode}</p>
-        <p class="poster-meta">总集数：${totalEpisodes}</p>
-        <p class="poster-meta">最后更新时间：${escapeHtml(fmt(series.updatedAt))}</p>
-        <p class="poster-meta">入库时间：${escapeHtml(fmt(series.firstIngestedAt))}</p>
+        <p class="poster-meta">最大集数：${maxEpisode}<br>总集数：${totalEpisodes}<br>最后更新时间：<br>${escapeHtml(fmt(series.updatedAt))}<br>入库时间：<br>${escapeHtml(fmt(series.firstIngestedAt))}</p>
       `;
       card.onclick = () => {
         history.pushState({}, '', `/${encodeURIComponent(series.name)}`);
