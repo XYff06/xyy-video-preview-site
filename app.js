@@ -367,15 +367,17 @@ function renderHome(container) {
   const pageSeries = state.homeSeries;
 
   pageSeries.forEach((series) => {
+      const maxEpisode = Math.max(...series.episodes.map((ep) => Number(ep.episode) || 0), 0);
+      const totalEpisodes = series.episodes.length;
       const card = document.createElement('article');
       card.className = 'poster-card';
       card.innerHTML = `
         <div class="poster" style="background-image:url('${series.poster}')"></div>
-        <p class="poster-title">${series.name}</p>
+        <p class="poster-title">${escapeHtml(series.name)}</p>
         <p class="poster-meta">最大集数：${maxEpisode}</p>
         <p class="poster-meta">总集数：${totalEpisodes}</p>
-        <p class="poster-meta">最后更新时间：${fmt(series.updatedAt)}</p>
-        <p class="poster-meta">入库时间：${fmt(series.firstIngestedAt)}</p>
+        <p class="poster-meta">最后更新时间：${escapeHtml(fmt(series.updatedAt))}</p>
+        <p class="poster-meta">入库时间：${escapeHtml(fmt(series.firstIngestedAt))}</p>
       `;
       card.onclick = () => {
         history.pushState({}, '', `/${encodeURIComponent(series.name)}`);
