@@ -57,9 +57,9 @@ function getAdminModalHtml() {
   if (!state.adminModalOpen) return '';
   return `
     <div class="modal-mask" id="admin-modal-mask">
-      <section class="admin-modal" role="dialog" aria-modal="true" aria-label="管理中心">
+      <section class="admin-modal" role="dialog" aria-modal="true" aria-label="管理">
         <header class="admin-modal-header">
-          <h3>管理中心</h3>
+          <h3>管理</h3>
           <button id="close-admin" class="icon-btn" type="button">✕</button>
         </header>
         <div class="admin-modal-tabs">
@@ -89,8 +89,9 @@ function render() {
   app.innerHTML = `
     <section class="layout-shell">
       <section class="content-shell">
-        <div class="toolbar-row">
-          <button id="open-admin" class="primary-btn" type="button">打开管理窗口</button>
+        <div class="top-row" id="top-row">
+          <div id="top-row-left"></div>
+          <button id="open-admin" class="primary-btn manage-btn" type="button">管理</button>
         </div>
         ${getFlashHtml()}
         <section id="page-content"></section>
@@ -143,11 +144,14 @@ function render() {
 
 function renderHome(container) {
   container.innerHTML = document.getElementById('home-template').innerHTML;
+  const topRowLeft = document.getElementById('top-row-left');
+  topRowLeft.innerHTML = '<header class="top-categories" id="category-list"></header>';
   const categoryList = document.getElementById('category-list');
   const grid = document.getElementById('series-grid');
 
   const allTags = getAllTags();
   const visibleTags = state.tagExpanded ? allTags : allTags.slice(0, 5);
+  const selectedHiddenTag = !state.tagExpanded && state.selectedTag !== null && !visibleTags.includes(state.selectedTag);
 
   const navItems = [
     { type: 'all', label: '全部' },
@@ -157,7 +161,11 @@ function renderHome(container) {
 
   navItems.forEach((item) => {
     const btn = document.createElement('button');
-    const isActive = item.type === 'all' ? state.selectedTag === null : item.type === 'tag' ? state.selectedTag === item.label : state.tagExpanded;
+    const isActive = item.type === 'all'
+      ? state.selectedTag === null
+      : item.type === 'tag'
+        ? state.selectedTag === item.label
+        : state.tagExpanded || selectedHiddenTag;
 
     btn.className = `category-pill ${isActive ? 'active' : ''}`;
     btn.textContent = item.label;
@@ -194,6 +202,8 @@ function renderHome(container) {
 }
 
 function renderDetail(container, series) {
+  const topRowLeft = document.getElementById('top-row-left');
+  topRowLeft.innerHTML = '';
   container.innerHTML = document.getElementById('detail-template').innerHTML;
 
   document.getElementById('back-home').onclick = () => {
@@ -227,7 +237,7 @@ function renderAdminPanel(container) {
         <h3>标签管理</h3>
         <div class="action-tabs">
           <button type="button" class="action-tab-btn ${state.activeTagAction === 'create' ? 'active' : ''}" data-tag-action="create">新增标签</button>
-          <button type="button" class="action-tab-btn ${state.activeTagAction === 'rename' ? 'active' : ''}" data-tag-action="rename">标签改名</button>
+          <button type="button" class="action-tab-btn ${state.activeTagAction === 'rename' ? 'active' : ''}" data-tag-action="rename">修改标签</button>
           <button type="button" class="action-tab-btn ${state.activeTagAction === 'delete' ? 'active' : ''}" data-tag-action="delete">删除标签</button>
         </div>
 
@@ -259,7 +269,6 @@ function renderAdminPanel(container) {
             </select>
             <button type="submit">删除标签</button>
           </form>
-          <p class="hint">删除后会从所有漫剧中移除该标签。</p>
         </section>
       </section>
     `;
