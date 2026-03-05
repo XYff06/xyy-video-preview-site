@@ -66,6 +66,35 @@ function readBody(req) {
   });
 }
 
+
+function normalizePathname(pathname) {
+  if (pathname.length > 1 && pathname.endsWith('/')) {
+    return pathname.slice(0, -1);
+  }
+  return pathname;
+}
+
+function getAllowedMethods(pathname) {
+  if (pathname === '/api/health') return ['GET'];
+  if (pathname === '/api/ingest-records') return ['GET'];
+  if (pathname === '/api/series') return ['GET'];
+  if (pathname === '/api/tags') return ['GET', 'POST'];
+  if (pathname.startsWith('/api/tags/')) return ['PATCH', 'DELETE'];
+  if (pathname === '/api/titles') return ['POST'];
+  if (pathname.startsWith('/api/titles/')) return ['PATCH', 'DELETE'];
+  if (pathname === '/api/episodes') return ['POST', 'PATCH', 'DELETE'];
+  return null;
+}
+
+function sendMethodNotAllowed(res, allowedMethods) {
+  res.writeHead(405, {
+    'Content-Type': MIME_TYPES['.json'],
+    Allow: allowedMethods.join(', ')
+  });
+  res.end(JSON.stringify({ message: `Method not allowed. Allowed: ${allowedMethods.join(', ')}` }));
+}
+
+
 function serveStatic(reqPath, res) {
   const unsafePath = reqPath === '/' ? '/index.html' : reqPath;
   const normalizedPath = path.normalize(unsafePath).replace(/^([.][.][/\\])+/, '');
@@ -212,20 +241,27 @@ async function getFlatIngestRecords() {
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  const pathname = normalizePathname(url.pathname);
 
   try {
-    if (url.pathname === '/api/health' && req.method === 'GET') {
+
+    if (pathname === '/api/health' && req.method === 'GET') {
+
       await pool.query('SELECT 1');
       sendJson(res, 200, { status: 'ok' });
       return;
     }
 
-    if (url.pathname === '/api/ingest-records' && req.method === 'GET') {
+
+    if (pathname === '/api/ingest-records' && req.method === 'GET') {
+
       sendJson(res, 200, { data: await getFlatIngestRecords() });
       return;
     }
 
-    if (url.pathname === '/api/series' && req.method === 'GET') {
+
+    if (pathname === '/api/series' && req.method === 'GET') {
+
       const payload = await querySeries({
         tag: url.searchParams.get('tag'),
         name: url.searchParams.get('name'),
@@ -238,13 +274,14 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (url.pathname === '/api/tags' && req.method === 'GET') {
+    if (pathname === '/api/tags' && req.method === 'GET') {
+
       const { rows } = await pool.query('SELECT tag_name FROM tag ORDER BY sort_no ASC, tag_name ASC');
       sendJson(res, 200, { data: rows.map((r) => r.tag_name) });
       return;
     }
 
-    if (url.pathname === '/api/tags' && req.method === 'POST') {
+    if (pathname === '/api/tags' && req.method === 'POST') {
       const body = await readBody(req);
       if (!validateNonEmptyString(body.tagName)) return sendJson(res, 400, { message: 'tagName 不能为空' });
       const tagName = body.tagName.trim();
@@ -258,7 +295,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const tagName = parsePathParams(url.pathname, '/api/tags/');
+    const tagName = parsePathParams(pathname, '/api/tags/');
     if (tagName !== null && req.method === 'PATCH') {
       const body = await readBody(req);
       if (!validateNonEmptyString(body.newTagName)) return sendJson(res, 400, { message: 'newTagName 不能为空' });
@@ -276,7 +313,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (url.pathname === '/api/titles' && req.method === 'POST') {
+    if (pathname === '/api/titles' && req.method === 'POST') {
       const body = await readBody(req);
       if (!validateNonEmptyString(body.name) || !validateNonEmptyString(body.poster)) {
         return sendJson(res, 400, { message: 'name 和 poster 不能为空' });
@@ -320,7 +357,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const titleName = parsePathParams(url.pathname, '/api/titles/');
+    const titleName = parsePathParams(pathname, '/api/titles/');
     if (titleName !== null && req.method === 'PATCH') {
       const body = await readBody(req);
       if (!validateNonEmptyString(body.newName) || !validateNonEmptyString(body.poster) || !Array.isArray(body.tags)) {
@@ -367,7 +404,9 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (url.pathname === '/api/episodes' && req.method === 'POST') {
+
+    if (pathname === '/api/episodes' && req.method === 'POST') {
+
       const body = await readBody(req);
       const episodeTitleName = String(body.titleName || '').trim();
       const episodeNo = Number(body.episodeNo);
@@ -387,7 +426,9 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (url.pathname === '/api/episodes' && req.method === 'PATCH') {
+
+    if (pathname === '/api/episodes' && req.method === 'PATCH') {
+
       const body = await readBody(req);
       const episodeTitleName = String(body.titleName || '').trim();
       const sourceNo = Number(body.episodeNo);
@@ -413,7 +454,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (url.pathname === '/api/episodes' && req.method === 'DELETE') {
+    if (pathname === '/api/episodes' && req.method === 'DELETE') {
       const body = await readBody(req);
       const episodeTitleName = String(body.titleName || '').trim();
       const episodeNo = Number(body.episodeNo);
@@ -426,11 +467,34 @@ const server = http.createServer(async (req, res) => {
       );
       if (!result.rowCount) return sendJson(res, 404, { message: '剧集不存在' });
       sendJson(res, 200, { message: '剧集删除成功' });
+
+      return;
+    }
+
+    if (pathname.startsWith('/api/')) {
+      const allowedMethods = getAllowedMethods(pathname);
+      if (req.method === 'OPTIONS') {
+        if (allowedMethods) {
+          res.writeHead(204, { Allow: allowedMethods.join(', ') });
+          res.end();
+          return;
+        }
+        sendJson(res, 404, { message: 'API endpoint not found.' });
+        return;
+      }
+
+      if (allowedMethods) {
+        sendMethodNotAllowed(res, allowedMethods);
+        return;
+      }
+
+      sendJson(res, 404, { message: 'API endpoint not found.' });
+
       return;
     }
 
     if (req.method === 'GET') {
-      serveStatic(url.pathname, res);
+      serveStatic(pathname, res);
       return;
     }
 
