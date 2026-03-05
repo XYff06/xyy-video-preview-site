@@ -88,14 +88,16 @@ function render() {
 
   app.innerHTML = `
     <section class="layout-shell">
+      <aside class="side-rail left-rail">
+        <div id="top-row-left"></div>
+      </aside>
       <section class="content-shell">
-        <div class="top-row" id="top-row">
-          <div id="top-row-left"></div>
-          <button id="open-admin" class="primary-btn manage-btn" type="button">管理</button>
-        </div>
         ${getFlashHtml()}
         <section id="page-content"></section>
       </section>
+      <aside class="side-rail right-rail">
+        <button id="open-admin" class="primary-btn manage-btn" type="button">管理</button>
+      </aside>
     </section>
     ${getAdminModalHtml()}
   `;
@@ -203,7 +205,7 @@ function renderHome(container) {
 
 function renderDetail(container, series) {
   const topRowLeft = document.getElementById('top-row-left');
-  topRowLeft.innerHTML = '';
+  topRowLeft.innerHTML = '<button id="back-home" class="back-btn">← 返回首页</button>';
   container.innerHTML = document.getElementById('detail-template').innerHTML;
 
   document.getElementById('back-home').onclick = () => {
