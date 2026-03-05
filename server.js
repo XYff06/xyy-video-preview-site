@@ -99,6 +99,12 @@ function validateNonEmptyString(v) {
   return typeof v === 'string' && v.trim().length > 0;
 }
 
+function parsePositiveInt(value, defaultValue) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return defaultValue;
+  return parsed;
+}
+
 function serveStatic(reqPath, res) {
   const unsafePath = reqPath === '/' ? '/index.html' : reqPath;
   const normalizedPath = path.normalize(unsafePath).replace(/^([.][.][/\\])+/, '');
@@ -147,16 +153,37 @@ const server = http.createServer(async (req, res) => {
       const seriesList = buildSeries(records);
       const tag = url.searchParams.get('tag');
       const name = url.searchParams.get('name');
+      const search = url.searchParams.get('search');
+      const pageSize = parsePositiveInt(url.searchParams.get('pageSize'), 25);
+      const requestedPage = parsePositiveInt(url.searchParams.get('page'), 1);
 
-      let data = seriesList;
+      let filtered = seriesList;
       if (tag) {
-        data = data.filter((series) => series.tags.includes(tag));
+        filtered = filtered.filter((series) => series.tags.includes(tag));
       }
       if (name) {
-        data = data.filter((series) => series.name === name);
+        filtered = filtered.filter((series) => series.name === name);
+      }
+      if (search) {
+        const normalizedSearch = search.trim().toLocaleLowerCase('zh-CN');
+        filtered = filtered.filter((series) => series.name.toLocaleLowerCase('zh-CN').includes(normalizedSearch));
       }
 
-      sendJson(res, 200, { data });
+      const total = filtered.length;
+      const totalPages = Math.max(1, Math.ceil(total / pageSize));
+      const page = Math.min(requestedPage, totalPages);
+      const start = (page - 1) * pageSize;
+      const data = filtered.slice(start, start + pageSize);
+
+      sendJson(res, 200, {
+        data,
+        pagination: {
+          total,
+          page,
+          pageSize,
+          totalPages
+        }
+      });
       return;
     }
 
