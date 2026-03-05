@@ -11,7 +11,8 @@ const state = {
   adminModalOpen: false,
   flashMessage: '',
   activeTagAction: 'create',
-  activeTitleAction: 'create'
+  activeTitleAction: 'create',
+  activeEpisodeAction: 'create'
 };
 
 function currentPathName() {
@@ -497,39 +498,125 @@ function renderAdminPanel(container) {
 
   container.innerHTML = `
     <section class="admin-panel">
-      <form id="episode-update-form" class="stack-form">
-        <select name="titleName" required>
-          <option value="">选择漫剧</option>
-          ${state.allSeries.map((series) => `<option value="${series.name}">${series.name}</option>`).join('')}
-        </select>
-        <input type="number" min="1" name="episodeNo" required placeholder="当前集号" />
-        <input type="number" min="1" name="newEpisodeNo" required placeholder="新集号" />
-        <input name="videoUrl" required placeholder="新播放 URL" />
-        <button type="submit">保存剧集信息</button>
-      </form>
-      <p class="hint">可修改集号和播放地址，适合修复错链或重排集数。</p>
+      <div class="action-tabs">
+        <button type="button" class="action-tab-btn ${state.activeEpisodeAction === 'create' ? 'active' : ''}" data-episode-action="create">新增剧集</button>
+        <button type="button" class="action-tab-btn ${state.activeEpisodeAction === 'rename' ? 'active' : ''}" data-episode-action="rename">修改剧集</button>
+        <button type="button" class="action-tab-btn ${state.activeEpisodeAction === 'delete' ? 'active' : ''}" data-episode-action="delete">删除剧集</button>
+      </div>
+
+      <section class="action-panel ${state.activeEpisodeAction === 'create' ? '' : 'hidden'}">
+        <form id="episode-create-form" class="stack-form">
+          <select name="titleName" required>
+            <option value="">选择漫剧</option>
+            ${state.allSeries.map((series) => `<option value="${series.name}">${series.name}</option>`).join('')}
+          </select>
+          <input type="number" min="1" name="episodeNo" required placeholder="集号" />
+          <input name="videoUrl" required placeholder="播放 URL" />
+          <button type="submit">新增</button>
+        </form>
+      </section>
+
+      <section class="action-panel ${state.activeEpisodeAction === 'rename' ? '' : 'hidden'}">
+        <form id="episode-update-form" class="stack-form">
+          <select name="titleName" required>
+            <option value="">选择漫剧</option>
+            ${state.allSeries.map((series) => `<option value="${series.name}">${series.name}</option>`).join('')}
+          </select>
+          <input type="number" min="1" name="episodeNo" required placeholder="当前集号" />
+          <input type="number" min="1" name="newEpisodeNo" required placeholder="新集号" />
+          <input name="videoUrl" required placeholder="新播放 URL" />
+          <button type="submit">修改</button>
+        </form>
+      </section>
+
+      <section class="action-panel ${state.activeEpisodeAction === 'delete' ? '' : 'hidden'}">
+        <form id="episode-delete-form" class="inline-form">
+          <select name="titleName" required>
+            <option value="">选择漫剧</option>
+            ${state.allSeries.map((series) => `<option value="${series.name}">${series.name}</option>`).join('')}
+          </select>
+          <input type="number" min="1" name="episodeNo" required placeholder="集号" />
+          <button type="submit">删除</button>
+        </form>
+      </section>
+      <p class="hint">支持新增、修改、删除剧集。</p>
     </section>
   `;
 
-  document.getElementById('episode-update-form').onsubmit = async (event) => {
-    event.preventDefault();
-    const formData = new FormData(event.target);
-    const payload = {
-      titleName: String(formData.get('titleName') || '').trim(),
-      episodeNo: Number(formData.get('episodeNo')),
-      newEpisodeNo: Number(formData.get('newEpisodeNo')),
-      videoUrl: String(formData.get('videoUrl') || '').trim()
-    };
-
-    try {
-      await apiFetch('/api/episodes', { method: 'PATCH', body: JSON.stringify(payload) });
-      state.flashMessage = '剧集信息更新成功';
-      await loadSeries();
-    } catch (error) {
-      state.flashMessage = error.message;
+  document.querySelectorAll('[data-episode-action]').forEach((btn) => {
+    btn.onclick = () => {
+      state.activeEpisodeAction = btn.dataset.episodeAction;
       render();
-    }
-  };
+    };
+  });
+
+  const episodeCreateForm = document.getElementById('episode-create-form');
+  if (episodeCreateForm) {
+    episodeCreateForm.onsubmit = async (event) => {
+      event.preventDefault();
+      const formData = new FormData(event.target);
+      const payload = {
+        titleName: String(formData.get('titleName') || '').trim(),
+        episodeNo: Number(formData.get('episodeNo')),
+        videoUrl: String(formData.get('videoUrl') || '').trim()
+      };
+
+      try {
+        await apiFetch('/api/episodes', { method: 'POST', body: JSON.stringify(payload) });
+        state.flashMessage = '剧集新增成功';
+        await loadSeries();
+      } catch (error) {
+        state.flashMessage = error.message;
+        render();
+      }
+    };
+  }
+
+  const episodeUpdateForm = document.getElementById('episode-update-form');
+  if (episodeUpdateForm) {
+    episodeUpdateForm.onsubmit = async (event) => {
+      event.preventDefault();
+      const formData = new FormData(event.target);
+      const payload = {
+        titleName: String(formData.get('titleName') || '').trim(),
+        episodeNo: Number(formData.get('episodeNo')),
+        newEpisodeNo: Number(formData.get('newEpisodeNo')),
+        videoUrl: String(formData.get('videoUrl') || '').trim()
+      };
+
+      try {
+        await apiFetch('/api/episodes', { method: 'PATCH', body: JSON.stringify(payload) });
+        state.flashMessage = '剧集信息修改成功';
+        await loadSeries();
+      } catch (error) {
+        state.flashMessage = error.message;
+        render();
+      }
+    };
+  }
+
+  const episodeDeleteForm = document.getElementById('episode-delete-form');
+  if (episodeDeleteForm) {
+    episodeDeleteForm.onsubmit = async (event) => {
+      event.preventDefault();
+      const formData = new FormData(event.target);
+      const payload = {
+        titleName: String(formData.get('titleName') || '').trim(),
+        episodeNo: Number(formData.get('episodeNo'))
+      };
+      if (!payload.titleName || Number.isNaN(payload.episodeNo)) return;
+      if (!confirm(`确认删除「${payload.titleName}」第${payload.episodeNo}集？`)) return;
+
+      try {
+        await apiFetch('/api/episodes', { method: 'DELETE', body: JSON.stringify(payload) });
+        state.flashMessage = '剧集删除成功';
+        await loadSeries();
+      } catch (error) {
+        state.flashMessage = error.message;
+        render();
+      }
+    };
+  }
 }
 
 window.addEventListener('popstate', render);
