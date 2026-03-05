@@ -223,6 +223,10 @@ body { margin: 0; background: var(--bg); color: var(--text); }
   padding: 0 10px;
   background: #fff;
 }
+.stack-form select[multiple] {
+  height: 120px;
+  padding: 8px 10px;
+}
 .inline-form button, .stack-form button {
   border: 1px solid var(--line);
   border-radius: 8px;

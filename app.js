@@ -238,17 +238,16 @@ function renderAdminPanel(container) {
       <section class="admin-panel">
         <h3>标签管理</h3>
         <div class="action-tabs">
-          <button type="button" class="action-tab-btn ${state.activeTagAction === 'create' ? 'active' : ''}" data-tag-action="create">新增标签</button>
+          <button type="button" class="action-tab-btn ${state.activeTagAction === 'create' ? 'active' : ''}" data-tag-action="create">新标签名</button>
           <button type="button" class="action-tab-btn ${state.activeTagAction === 'rename' ? 'active' : ''}" data-tag-action="rename">修改标签</button>
           <button type="button" class="action-tab-btn ${state.activeTagAction === 'delete' ? 'active' : ''}" data-tag-action="delete">删除标签</button>
         </div>
 
         <section class="action-panel ${state.activeTagAction === 'create' ? '' : 'hidden'}">
           <form id="tag-create-form" class="inline-form">
-            <input name="tagName" required placeholder="新标签名称" />
+            <input name="tagName" required placeholder="标签名" />
             <button type="submit">新增标签</button>
           </form>
-          <p class="hint">仅执行新增标签操作，不会触发改名或删除。</p>
         </section>
 
         <section class="action-panel ${state.activeTagAction === 'rename' ? '' : 'hidden'}">
@@ -257,10 +256,9 @@ function renderAdminPanel(container) {
               <option value="">选择标签</option>
               ${tags.map((tag) => `<option value="${tag}">${tag}</option>`).join('')}
             </select>
-            <input name="newTagName" required placeholder="改名后的标签" />
-            <button type="submit">确认改名</button>
+            <input name="newTagName" required placeholder="新标签名" />
+            <button type="submit">修改</button>
           </form>
-          <p class="hint">选择一个标签并填写新名称后再提交。</p>
         </section>
 
         <section class="action-panel ${state.activeTagAction === 'delete' ? '' : 'hidden'}">
@@ -355,10 +353,11 @@ function renderAdminPanel(container) {
           <form id="title-create-form" class="stack-form">
             <input name="name" required placeholder="新漫剧名称" />
             <input name="poster" required placeholder="海报 URL" />
-            <input name="tags" placeholder="标签（逗号分隔，如：国产剧,悬疑）" />
+            <select name="tags" multiple>
+              ${tags.length ? tags.map((tag) => `<option value="${tag}">${tag}</option>`).join('') : '<option value="" disabled>暂无可选标签</option>'}
+            </select>
             <button type="submit">新增漫剧</button>
           </form>
-          <p class="hint">可用标签：${tags.join('、') || '暂无'}</p>
         </section>
 
         <section class="action-panel ${state.activeTitleAction === 'rename' ? '' : 'hidden'}">
@@ -368,7 +367,7 @@ function renderAdminPanel(container) {
               ${state.allSeries.map((series) => `<option value="${series.name}">${series.name}</option>`).join('')}
             </select>
             <input name="newName" required placeholder="改名后的漫剧名称" />
-            <button type="submit">确认改名</button>
+            <button type="submit">修改</button>
           </form>
           <p class="hint">只执行改名操作，提交前请填写新名称。</p>
         </section>
@@ -400,10 +399,9 @@ function renderAdminPanel(container) {
         const formData = new FormData(event.target);
         const name = String(formData.get('name') || '').trim();
         const poster = String(formData.get('poster') || '').trim();
-        const tagsInput = String(formData.get('tags') || '');
-        const titleTags = tagsInput
-          .split(',')
-          .map((v) => v.trim())
+        const titleTags = formData
+          .getAll('tags')
+          .map((tag) => String(tag).trim())
           .filter(Boolean);
         try {
           await apiFetch('/api/titles', { method: 'POST', body: JSON.stringify({ name, poster, tags: titleTags }) });
