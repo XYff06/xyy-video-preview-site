@@ -208,8 +208,34 @@ curl http://localhost:4173/api/health
 ├─ styles.css             # 前端样式
 ├─ index.html             # 页面模板
 ├─ server.js              # Node HTTP + API + 静态资源
+├─ desktop_admin/
+│  └─ qt_admin.py         # Python + PyQt5 管理端（调用现有 API）
 ├─ db/
 │  └─ schema.sql          # PostgreSQL 建表脚本
 └─ data/
    └─ ingest-records.json # 示例数据
 ```
+
+---
+
+## 8. Qt5 管理端（新增）
+
+为便于后续将管理模块迁移到桌面端，项目新增了一个 Python + PyQt5 的管理工具：
+
+- 文件路径：`desktop_admin/qt_admin.py`
+- 默认 API 地址：`http://127.0.0.1:4173`
+- 功能覆盖：标签管理、漫剧管理、剧集管理（新增/修改/删除/批量导入目录）
+
+### 8.1 安装依赖
+
+```bash
+python3 -m pip install PyQt5 requests
+```
+
+### 8.2 启动
+
+```bash
+python3 desktop_admin/qt_admin.py
+```
+
+启动后可在窗口顶部修改 API Base URL，并通过“测试连接”确认服务可用。
