@@ -116,12 +116,18 @@ function sendMethodNotAllowed(res, allowedMethods) {
   res.end(JSON.stringify({ message: `Method not allowed. Allowed: ${allowedMethods.join(', ')}` }));
 }
 
-function sendMethodNotAllowed(res, allowedMethods) {
-  res.writeHead(405, {
-    'Content-Type': MIME_TYPES['.json'],
-    Allow: allowedMethods.join(', ')
-  });
-  res.end(JSON.stringify({ message: `Method not allowed. Allowed: ${allowedMethods.join(', ')}` }));
+async function assignTitleTags(client, titleId, tags) {
+  await client.query('DELETE FROM title_tag WHERE title_id = $1', [titleId]);
+  if (!tags.length) return;
+
+  const sql = `
+    INSERT INTO title_tag(title_id, tag_id)
+    SELECT $1, tag.id
+    FROM tag
+    WHERE tag.tag_name = ANY($2)
+    ON CONFLICT DO NOTHING
+  `;
+  await client.query(sql, [titleId, tags]);
 }
 
 
@@ -470,18 +476,7 @@ const server = http.createServer(async (req, res) => {
           [name, poster]
         );
         const titleId = titleInsert.rows[0].id;
-        if (tags.length) {
-          const tagRows = await client.query('SELECT id, tag_name FROM tag WHERE tag_name = ANY($1)', [tags]);
-          const tagIdMap = new Map(tagRows.rows.map((r) => [r.tag_name, r.id]));
-          for (const t of tags) {
-            if (tagIdMap.has(t)) {
-              await client.query(
-                'INSERT INTO title_tag(title_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-                [titleId, tagIdMap.get(t)]
-              );
-            }
-          }
-        }
+        await assignTitleTags(client, titleId, tags);
         await client.query('COMMIT');
       } catch (e) {
         await client.query('ROLLBACK');
@@ -516,12 +511,7 @@ const server = http.createServer(async (req, res) => {
         const titleId = titleRes.rows[0].id;
         await client.query('UPDATE title SET name = $2, cover_url = $3 WHERE id = $1', [titleId, newName, poster]);
 
-        const tagRows = await client.query('SELECT id, tag_name FROM tag WHERE tag_name = ANY($1)', [tags]);
-        const tagIds = tagRows.rows.map((r) => r.id);
-        await client.query('DELETE FROM title_tag WHERE title_id = $1', [titleId]);
-        for (const tagId of tagIds) {
-          await client.query('INSERT INTO title_tag(title_id, tag_id) VALUES ($1, $2)', [titleId, tagId]);
-        }
+        await assignTitleTags(client, titleId, tags);
         await client.query('COMMIT');
       } catch (e) {
         await client.query('ROLLBACK');
@@ -607,28 +597,38 @@ const server = http.createServer(async (req, res) => {
           return sendJson(res, 400, { message: '所选标签不存在，请先创建标签' });
         }
 
-        const tagIdMap = new Map(tagRows.rows.map((row) => [row.tag_name, row.id]));
-        await client.query('DELETE FROM title_tag WHERE title_id = $1', [titleId]);
-        for (const tagName of tags) {
-          if (!tagIdMap.has(tagName)) continue;
-          await client.query('INSERT INTO title_tag(title_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [titleId, tagIdMap.get(tagName)]);
-        }
+        await assignTitleTags(client, titleId, tags);
 
-        let inserted = 0;
-        let updated = 0;
-
-        for (const episode of parsedEpisodes) {
-          const result = await client.query(
-            `INSERT INTO episode(title_id, episode_no, episode_url)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (title_id, episode_no)
-             DO UPDATE SET episode_url = EXCLUDED.episode_url
-             RETURNING (xmax = 0) AS inserted`,
-            [titleId, episode.episodeNo, episode.videoUrl]
-          );
-          if (result.rows[0]?.inserted) inserted += 1;
-          else updated += 1;
-        }
+        const episodeNos = parsedEpisodes.map((episode) => episode.episodeNo);
+        const episodeUrls = parsedEpisodes.map((episode) => episode.videoUrl);
+        const upsertSql = `
+          WITH input AS (
+            SELECT *
+            FROM UNNEST($2::int[], $3::text[]) AS u(episode_no, episode_url)
+          ),
+          inserted AS (
+            INSERT INTO episode(title_id, episode_no, episode_url)
+            SELECT $1, i.episode_no, i.episode_url
+            FROM input i
+            ON CONFLICT (title_id, episode_no) DO NOTHING
+            RETURNING episode_no
+          ),
+          updated AS (
+            UPDATE episode e
+            SET episode_url = i.episode_url
+            FROM input i
+            WHERE e.title_id = $1
+              AND e.episode_no = i.episode_no
+              AND NOT EXISTS (SELECT 1 FROM inserted ins WHERE ins.episode_no = i.episode_no)
+            RETURNING e.episode_no
+          )
+          SELECT
+            (SELECT COUNT(*)::int FROM inserted) AS inserted,
+            (SELECT COUNT(*)::int FROM updated) AS updated
+        `;
+        const upsertRes = await client.query(upsertSql, [titleId, episodeNos, episodeUrls]);
+        const inserted = upsertRes.rows[0]?.inserted ?? 0;
+        const updated = upsertRes.rows[0]?.updated ?? 0;
 
         await client.query('COMMIT');
         sendJson(res, 201, {

@@ -1,5 +1,7 @@
 BEGIN;
 
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 CREATE TABLE IF NOT EXISTS title (
   id BIGSERIAL PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
@@ -16,6 +18,7 @@ CREATE TABLE IF NOT EXISTS title (
 );
 
 CREATE INDEX IF NOT EXISTS index_title_updated_at ON title (updated_at DESC);
+CREATE INDEX IF NOT EXISTS index_title_name_lower_trgm ON title USING GIN (LOWER(name) gin_trgm_ops);
 
 CREATE TABLE IF NOT EXISTS episode (
   id BIGSERIAL PRIMARY KEY,
@@ -29,6 +32,8 @@ CREATE TABLE IF NOT EXISTS episode (
   CONSTRAINT check_episode_episode_no_positive CHECK (episode_no > 0),
   CONSTRAINT check_episode_episode_url_not_blank CHECK (btrim(episode_url) <> '')
 );
+
+CREATE INDEX IF NOT EXISTS index_episode_title_id ON episode (title_id);
 
 CREATE TABLE IF NOT EXISTS tag (
   id BIGSERIAL PRIMARY KEY,
