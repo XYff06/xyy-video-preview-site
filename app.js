@@ -54,7 +54,11 @@ async function loadSeries() {
       apiFetch('/api/series?page=1&pageSize=10000'),
       loadTags()
     ]);
-    state.allSeries = seriesPayload.data.map((item) => ({ ...item, tags: new Set(item.tags) }));
+    state.allSeries = seriesPayload.data.map((item) => ({
+      ...item,
+      tags: new Set(item.tags),
+      episodes: normalizeEpisodes(item.episodes || [])
+    }));
     state.loading = false;
     state.error = null;
   } catch (error) {
@@ -83,7 +87,10 @@ async function loadHomeSeries() {
 
   try {
     const payload = await apiFetch(`/api/series?${params.toString()}`);
-    state.homeSeries = payload.data;
+    state.homeSeries = payload.data.map((item) => ({
+      ...item,
+      episodes: normalizeEpisodes(item.episodes || [])
+    }));
     state.homeTotal = payload.pagination?.total ?? payload.data.length;
     state.currentPage = payload.pagination?.page ?? state.currentPage;
     state.homeLoading = false;
@@ -113,10 +120,33 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+function normalizeEpisodes(episodes) {
+  const normalized = new Map();
+
+  episodes.forEach((episode) => {
+    const episodeNo = Number(episode.episode);
+    if (!Number.isFinite(episodeNo)) return;
+
+    const current = normalized.get(episodeNo);
+    if (!current) {
+      normalized.set(episodeNo, { ...episode, episode: episodeNo });
+      return;
+    }
+
+    const currentUpdatedAt = new Date(current.updatedAt || 0).getTime();
+    const nextUpdatedAt = new Date(episode.updatedAt || 0).getTime();
+    if (nextUpdatedAt >= currentUpdatedAt) {
+      normalized.set(episodeNo, { ...episode, episode: episodeNo });
+    }
+  });
+
+  return [...normalized.values()].sort((a, b) => a.episode - b.episode);
+}
+
 function getEpisodeOptionsByTitle(titleName) {
   const target = state.allSeries.find((series) => series.name === titleName);
   if (!target) return [];
-  return [...target.episodes].sort((a, b) => a.episode - b.episode);
+  return normalizeEpisodes(target.episodes);
 }
 
 function getTagMultiSelectHtml(fieldName, tags, selectedTags = []) {
@@ -171,14 +201,18 @@ function fillEpisodeSelectByTitle(titleSelect, episodeSelect, placeholderText) {
     .join('')}`;
 }
 
-function validateTagSelection(form, fieldName, message) {
+function setFieldError(errorNode, message = '') {
+  if (!errorNode) return;
+  errorNode.textContent = message;
+  errorNode.classList.toggle('hidden', !message);
+}
+
+function validateTagSelection(form, fieldName, errorNode, message) {
   const checkboxes = [...form.querySelectorAll(`input[name="${fieldName}"]`)];
   if (checkboxes.length === 0) return false;
 
   const hasSelection = checkboxes.some((checkbox) => checkbox.checked);
-  const firstCheckbox = checkboxes[0];
-  firstCheckbox.setCustomValidity(hasSelection ? '' : message);
-  firstCheckbox.reportValidity();
+  setFieldError(errorNode, hasSelection ? '' : message);
   return hasSelection;
 }
 
@@ -674,6 +708,7 @@ function renderAdminPanel(container) {
             <input name="name" required placeholder="漫剧名" />
             <input name="poster" required placeholder="海报URL" />
             ${getTagMultiSelectHtml('tags', tags)}
+            <p id="title-create-tags-error" class="field-error hidden" role="alert" aria-live="polite"></p>
             <button type="submit">新增</button>
           </form>
         </section>
@@ -714,6 +749,13 @@ function renderAdminPanel(container) {
 
     const titleCreateForm = document.getElementById('title-create-form');
     if (titleCreateForm) {
+      const tagsErrorNode = titleCreateForm.querySelector('#title-create-tags-error');
+      titleCreateForm.querySelectorAll('input[name="tags"]').forEach((checkbox) => {
+        checkbox.onchange = () => {
+          validateTagSelection(titleCreateForm, 'tags', tagsErrorNode, '请至少选择一个标签');
+        };
+      });
+
       titleCreateForm.onsubmit = async (event) => {
         event.preventDefault();
         const formData = new FormData(event.target);
@@ -723,7 +765,7 @@ function renderAdminPanel(container) {
           .getAll('tags')
           .map((tag) => String(tag).trim())
           .filter(Boolean);
-        if (!validateTagSelection(event.target, 'tags', '请至少选择一个标签')) {
+        if (!validateTagSelection(event.target, 'tags', tagsErrorNode, '请至少选择一个标签')) {
           return;
         }
         try {
