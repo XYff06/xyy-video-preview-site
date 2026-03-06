@@ -19,6 +19,9 @@ const state = {
   activeAdminTab: 'tag',
   adminModalOpen: false,
   flashMessage: '',
+  flashAutoCloseTimeout: null,
+  flashVersion: 0,
+  flashVersionRendered: 0,
   activeTagAction: 'create',
   activeTitleAction: 'create',
   activeEpisodeAction: 'create'
@@ -178,6 +181,19 @@ function getFlashHtml() {
   `;
 }
 
+function setFlashMessage(message) {
+  state.flashMessage = message;
+  state.flashVersion += 1;
+}
+
+function clearFlashMessage() {
+  state.flashMessage = '';
+  if (state.flashAutoCloseTimeout) {
+    clearTimeout(state.flashAutoCloseTimeout);
+    state.flashAutoCloseTimeout = null;
+  }
+}
+
 function getAdminModalHtml() {
   if (!state.adminModalOpen) return '';
   return `
@@ -233,9 +249,19 @@ function render() {
   };
 
   const flashCloseBtn = document.getElementById('flash-close-btn');
+  if (state.flashMessage && state.flashVersionRendered !== state.flashVersion) {
+    if (state.flashAutoCloseTimeout) {
+      clearTimeout(state.flashAutoCloseTimeout);
+    }
+    state.flashVersionRendered = state.flashVersion;
+    state.flashAutoCloseTimeout = setTimeout(() => {
+      clearFlashMessage();
+      render();
+    }, 5000);
+  }
   if (flashCloseBtn) {
     flashCloseBtn.onclick = () => {
-      state.flashMessage = '';
+      clearFlashMessage();
       render();
     };
   }
@@ -562,10 +588,10 @@ function renderAdminPanel(container) {
         const tagName = String(formData.get('tagName') || '').trim();
         try {
           await apiFetch('/api/tags', { method: 'POST', body: JSON.stringify({ tagName }) });
-          state.flashMessage = `标签「${tagName}」已创建`;
+          setFlashMessage(`标签「${tagName}」已创建`);
           await loadSeries();
         } catch (error) {
-          state.flashMessage = error.message;
+          setFlashMessage(error.message);
           render();
         }
       };
@@ -582,11 +608,11 @@ function renderAdminPanel(container) {
 
         try {
           await apiFetch(`/api/tags/${encodeURIComponent(tag)}`, { method: 'PATCH', body: JSON.stringify({ newTagName }) });
-          state.flashMessage = '标签改名成功';
+          setFlashMessage('标签改名成功');
           if (state.selectedTag === tag) state.selectedTag = newTagName;
           await loadSeries();
         } catch (error) {
-          state.flashMessage = error.message;
+          setFlashMessage(error.message);
           render();
         }
       };
@@ -603,11 +629,11 @@ function renderAdminPanel(container) {
 
         try {
           await apiFetch(`/api/tags/${encodeURIComponent(tag)}`, { method: 'DELETE' });
-          state.flashMessage = '标签删除成功';
+          setFlashMessage('标签删除成功');
           if (state.selectedTag === tag) state.selectedTag = null;
           await loadSeries();
         } catch (error) {
-          state.flashMessage = error.message;
+          setFlashMessage(error.message);
           render();
         }
       };
@@ -680,16 +706,16 @@ function renderAdminPanel(container) {
           .map((tag) => String(tag).trim())
           .filter(Boolean);
         if (titleTags.length === 0) {
-          state.flashMessage = '请至少选择一个标签';
+          setFlashMessage('请至少选择一个标签');
           render();
           return;
         }
         try {
           await apiFetch('/api/titles', { method: 'POST', body: JSON.stringify({ name, poster, tags: titleTags }) });
-          state.flashMessage = `漫剧「${name}」已创建`;
+          setFlashMessage(`漫剧「${name}」已创建`);
           await loadSeries();
         } catch (error) {
-          state.flashMessage = error.message;
+          setFlashMessage(error.message);
           render();
         }
       };
@@ -732,11 +758,11 @@ function renderAdminPanel(container) {
 
         try {
           await apiFetch(`/api/titles/${encodeURIComponent(oldName)}`, { method: 'PATCH', body: JSON.stringify({ newName, poster: newPoster, tags: newTags }) });
-          state.flashMessage = '漫剧信息修改成功';
+          setFlashMessage('漫剧信息修改成功');
           if (currentPathName() === oldName) history.replaceState({}, '', `/${encodeURIComponent(newName)}`);
           await loadSeries();
         } catch (error) {
-          state.flashMessage = error.message;
+          setFlashMessage(error.message);
           render();
         }
       };
@@ -753,11 +779,11 @@ function renderAdminPanel(container) {
 
         try {
           await apiFetch(`/api/titles/${encodeURIComponent(oldName)}`, { method: 'DELETE' });
-          state.flashMessage = '漫剧删除成功';
+          setFlashMessage('漫剧删除成功');
           if (currentPathName() === oldName) history.replaceState({}, '', '/');
           await loadSeries();
         } catch (error) {
-          state.flashMessage = error.message;
+          setFlashMessage(error.message);
           render();
         }
       };
@@ -838,10 +864,10 @@ function renderAdminPanel(container) {
         if (currentPathName() === payload.titleName) {
           state.selectedEpisode = payload.episodeNo;
         }
-        state.flashMessage = '剧集新增成功';
+        setFlashMessage('剧集新增成功');
         await loadSeries();
       } catch (error) {
-        state.flashMessage = error.message;
+        setFlashMessage(error.message);
         render();
       }
     };
@@ -872,10 +898,10 @@ function renderAdminPanel(container) {
 
       try {
         await apiFetch('/api/episodes', { method: 'PATCH', body: JSON.stringify(payload) });
-        state.flashMessage = '剧集信息修改成功';
+        setFlashMessage('剧集信息修改成功');
         await loadSeries();
       } catch (error) {
-        state.flashMessage = error.message;
+        setFlashMessage(error.message);
         render();
       }
     };
@@ -905,10 +931,10 @@ function renderAdminPanel(container) {
 
       try {
         await apiFetch('/api/episodes', { method: 'DELETE', body: JSON.stringify(payload) });
-        state.flashMessage = '剧集删除成功';
+        setFlashMessage('剧集删除成功');
         await loadSeries();
       } catch (error) {
-        state.flashMessage = error.message;
+        setFlashMessage(error.message);
         render();
       }
     };
