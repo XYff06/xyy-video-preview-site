@@ -1,8 +1,20 @@
-const fmt = (iso) => new Date(iso).toLocaleString('zh-CN', { hour12: false });
+/**
+ * 将 ISO 时间字符串格式化为中文本地时间（24 小时制）。
+ * @param {string} isoDateTime - ISO 格式时间字符串。
+ * @returns {string} 格式化后的时间文本。
+ */
+const formatDateTime = (isoDateTime) => new Date(isoDateTime).toLocaleString('zh-CN', { hour12: false });
 
+/**
+ * 页面全局状态。
+ * 说明：集中管理首页筛选、详情页、管理弹窗与提示消息等状态，便于统一渲染。
+ */
 const state = {
+  // 全量数据缓存
   allSeries: [],
   allTags: [],
+
+  // 首页筛选与分页
   selectedTag: null,
   searchQuery: '',
   sortBy: 'updated_desc',
@@ -12,28 +24,46 @@ const state = {
   homeTotal: 0,
   homeLoading: false,
   homeError: null,
+
+  // 详情页状态
   selectedEpisode: null,
   episodePage: 1,
   episodePageSize: 10,
   detailSeriesName: '',
+
+  // UI 控制状态
   tagExpanded: false,
   loading: true,
   error: null,
   activeAdminTab: 'tag',
   adminModalOpen: false,
+
+  // 顶部消息提示状态
   flashMessage: '',
   flashAutoCloseTimeout: null,
   flashVersion: 0,
   flashVersionRendered: 0,
+
+  // 管理弹窗子操作页签
   activeTagAction: 'create',
   activeTitleAction: 'create',
   activeEpisodeAction: 'create'
 };
 
+/**
+ * 获取当前路由中的漫剧名（去掉开头 `/` 并解码）。
+ * @returns {string} 当前路由对应的漫剧名，首页时为空字符串。
+ */
 function currentPathName() {
   return decodeURIComponent(location.pathname.slice(1));
 }
 
+/**
+ * 统一的 API 请求封装：自动附加 JSON 头、解析响应并处理错误。
+ * @param {string} url - 请求地址。
+ * @param {RequestInit} [options={}] - fetch 配置项。
+ * @returns {Promise<any>} 接口返回的 JSON 数据。
+ */
 async function apiFetch(url, options = {}) {
   const response = await fetch(url, {
     headers: { 'Content-Type': 'application/json' },
@@ -46,11 +76,19 @@ async function apiFetch(url, options = {}) {
   return payload;
 }
 
+/**
+ * 拉取标签列表并写入状态。
+ * @returns {Promise<void>}
+ */
 async function loadTags() {
   const payload = await apiFetch('/api/tags');
   state.allTags = payload.data;
 }
 
+/**
+ * 拉取所有漫剧及标签，完成后触发页面渲染。
+ * @returns {Promise<void>}
+ */
 async function loadSeries() {
   try {
     const [seriesPayload] = await Promise.all([
@@ -76,6 +114,10 @@ async function loadSeries() {
   }
 }
 
+/**
+ * 根据首页筛选条件拉取分页数据并刷新页面。
+ * @returns {Promise<void>}
+ */
 async function loadHomeSeries() {
   state.homeLoading = true;
   state.homeError = null;
@@ -108,12 +150,21 @@ async function loadHomeSeries() {
   render();
 }
 
+/**
+ * 获取可用标签列表：优先使用后端标签；无后端标签时从剧集数据推导。
+ * @returns {string[]} 排序后的标签数组。
+ */
 function getAllTags() {
   if (state.allTags.length) return [...state.allTags];
   return [...new Set(state.allSeries.flatMap((item) => [...item.tags]))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
 }
 
 
+/**
+ * 转义 HTML 特殊字符，避免插入内容导致 XSS。
+ * @param {string} value - 原始文本。
+ * @returns {string} 安全文本。
+ */
 function escapeHtml(value) {
   return String(value)
     .replace(/&/g, '&amp;')
@@ -123,6 +174,11 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+/**
+ * 标准化剧集列表：同集号保留更新时间较新的记录，并按集号升序。
+ * @param {Array<{episode:number|string, updatedAt?:string}>} episodes - 原始剧集列表。
+ * @returns {Array<object>} 标准化后的剧集列表。
+ */
 function normalizeEpisodes(episodes) {
   const normalized = new Map();
 
@@ -146,6 +202,11 @@ function normalizeEpisodes(episodes) {
   return [...normalized.values()].sort((a, b) => a.episode - b.episode);
 }
 
+/**
+ * 按漫剧名获取可选剧集。
+ * @param {string} titleName - 漫剧名。
+ * @returns {Array<object>} 对应漫剧的剧集列表。
+ */
 function getEpisodeOptionsByTitle(titleName) {
   const target = state.allSeries.find((series) => series.name === titleName);
   if (!target) return [];
@@ -448,7 +509,7 @@ function renderHome(container) {
       card.innerHTML = `
         <div class="poster" style="background-image:url('${series.poster}')"></div>
         <p class="poster-title">${escapeHtml(series.name)}</p>
-        <p class="poster-meta">最大集数：${maxEpisode}<br>总集数：${totalEpisodes}<br>最后更新时间：<br>${escapeHtml(fmt(series.updatedAt))}<br>入库时间：<br>${escapeHtml(fmt(series.firstIngestedAt))}</p>
+        <p class="poster-meta">最大集数：${maxEpisode}<br>总集数：${totalEpisodes}<br>最后更新时间：<br>${escapeHtml(formatDateTime(series.updatedAt))}<br>入库时间：<br>${escapeHtml(formatDateTime(series.firstIngestedAt))}</p>
       `;
       card.onclick = () => {
         history.pushState({}, '', `/${encodeURIComponent(series.name)}`);
@@ -604,8 +665,8 @@ function renderDetail(container, series) {
   playerMeta.innerHTML = `
     <p class="player-meta-title">${escapeHtml(series.name)}</p>
     <p class="player-meta-time-row">
-      <span>首次入库：${escapeHtml(fmt(selected.firstIngestedAt))}</span>
-      <span>最近更新：${escapeHtml(fmt(selected.updatedAt))}</span>
+      <span>首次入库：${escapeHtml(formatDateTime(selected.firstIngestedAt))}</span>
+      <span>最近更新：${escapeHtml(formatDateTime(selected.updatedAt))}</span>
     </p>
     <p class="player-meta-url">${escapeHtml(selected.videoUrl)}</p>
   `;
