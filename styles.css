@@ -489,6 +489,16 @@ body { margin: 0; background: var(--bg); color: var(--text); }
   padding: 0 12px;
 }
 
+.field-error {
+  margin: -4px 2px 0;
+  color: #d14343;
+  font-size: 13px;
+}
+
+.field-error.hidden {
+  display: none;
+}
+
 .hint { color: var(--muted); font-size: 12px; margin-top: -4px; }
 
 @media (max-width: 1080px) {
