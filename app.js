@@ -851,8 +851,9 @@ function renderAdminPanel(container) {
 
   container.innerHTML = `
     <section class="admin-panel">
-      <div class="action-tabs">
+      <div class="action-tabs episode-action-tabs">
         <button type="button" class="action-tab-btn ${state.activeEpisodeAction === 'create' ? 'active' : ''}" data-episode-action="create">新增剧集</button>
+        <button type="button" class="action-tab-btn ${state.activeEpisodeAction === 'batch' ? 'active' : ''}" data-episode-action="batch">批量导入</button>
         <button type="button" class="action-tab-btn ${state.activeEpisodeAction === 'rename' ? 'active' : ''}" data-episode-action="rename">修改剧集</button>
         <button type="button" class="action-tab-btn ${state.activeEpisodeAction === 'delete' ? 'active' : ''}" data-episode-action="delete">删除剧集</button>
       </div>
@@ -866,6 +867,18 @@ function renderAdminPanel(container) {
           <input type="number" min="1" name="episodeNo" required placeholder="集号" />
           <input name="videoUrl" required placeholder="播放URL" />
           <button type="submit">新增</button>
+        </form>
+      </section>
+
+      <section class="action-panel ${state.activeEpisodeAction === 'batch' ? '' : 'hidden'}">
+        <form id="episode-batch-form" class="stack-form">
+          <input name="name" required placeholder="漫剧名" />
+          <input name="poster" required placeholder="海报URL" />
+          <input name="directoryUrl" required placeholder="视频目录URL，例如 http://localhost:7777/某个目录/" />
+          ${getTagMultiSelectHtml('batchTags', getAllTags())}
+          <p id="episode-batch-tags-error" class="field-error hidden" role="alert" aria-live="polite"></p>
+          <p class="hint">会自动解析目录下视频链接并按文件名中的“第1集/第一集/EP01”等集号排序导入。</p>
+          <button type="submit">批量导入</button>
         </form>
       </section>
 
@@ -906,6 +919,8 @@ function renderAdminPanel(container) {
     };
   });
 
+  bindMultiSelectSummary(container);
+
   const episodeCreateForm = document.getElementById('episode-create-form');
   if (episodeCreateForm) {
     episodeCreateForm.onsubmit = async (event) => {
@@ -923,6 +938,45 @@ function renderAdminPanel(container) {
           state.selectedEpisode = payload.episodeNo;
         }
         setFlashMessage('剧集新增成功');
+        await loadSeries();
+      } catch (error) {
+        setFlashMessage(error.message);
+        render();
+      }
+    };
+  }
+
+
+  const episodeBatchForm = document.getElementById('episode-batch-form');
+  if (episodeBatchForm) {
+    const tagsErrorNode = episodeBatchForm.querySelector('#episode-batch-tags-error');
+    episodeBatchForm.querySelectorAll('input[name="batchTags"]').forEach((checkbox) => {
+      checkbox.onchange = () => {
+        validateTagSelection(episodeBatchForm, 'batchTags', tagsErrorNode, '请至少选择一个标签');
+      };
+    });
+
+    episodeBatchForm.onsubmit = async (event) => {
+      event.preventDefault();
+      if (!validateTagSelection(episodeBatchForm, 'batchTags', tagsErrorNode, '请至少选择一个标签')) return;
+
+      const formData = new FormData(event.target);
+      const payload = {
+        name: String(formData.get('name') || '').trim(),
+        poster: String(formData.get('poster') || '').trim(),
+        directoryUrl: String(formData.get('directoryUrl') || '').trim(),
+        tags: formData.getAll('batchTags').map((item) => String(item).trim()).filter(Boolean)
+      };
+
+      try {
+        const result = await apiFetch('/api/episodes/batch-directory', { method: 'POST', body: JSON.stringify(payload) });
+        const total = result.data?.total ?? 0;
+        const inserted = result.data?.inserted ?? 0;
+        const updated = result.data?.updated ?? 0;
+        setFlashMessage(`批量导入成功：共 ${total} 集，新增 ${inserted} 集，更新 ${updated} 集`);
+        if (currentPathName() === payload.name) {
+          state.selectedEpisode = 1;
+        }
         await loadSeries();
       } catch (error) {
         setFlashMessage(error.message);

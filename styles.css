@@ -371,6 +371,11 @@ body { margin: 0; background: var(--bg); color: var(--text); }
   margin-bottom: 12px;
 }
 
+
+.episode-action-tabs {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .action-tab-btn {
   border: 1px solid var(--line);
   border-radius: 8px;

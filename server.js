@@ -104,6 +104,7 @@ function getAllowedMethods(pathname) {
   if (pathname === '/api/titles') return ['POST'];
   if (pathname.startsWith('/api/titles/')) return ['PATCH', 'DELETE'];
   if (pathname === '/api/episodes') return ['POST', 'PATCH', 'DELETE'];
+  if (pathname === '/api/episodes/batch-directory') return ['POST'];
   return null;
 }
 
@@ -164,6 +165,109 @@ function resolveSort(sort) {
   };
 
   return sortMap[sort] || sortMap.updated_desc;
+}
+
+const VIDEO_EXTENSION_RE = /\.(mp4|m3u8|mov|mkv|avi|flv|webm|ts|m4v)(?:$|[?#])/i;
+const CHINESE_DIGIT_MAP = {
+  零: 0,
+  〇: 0,
+  一: 1,
+  二: 2,
+  两: 2,
+  三: 3,
+  四: 4,
+  五: 5,
+  六: 6,
+  七: 7,
+  八: 8,
+  九: 9
+};
+
+function parseChineseNumber(raw) {
+  if (!raw) return null;
+  if (/^\d+$/.test(raw)) return Number(raw);
+  let total = 0;
+  let current = 0;
+  for (const ch of raw) {
+    if (ch in CHINESE_DIGIT_MAP) {
+      current = CHINESE_DIGIT_MAP[ch];
+      continue;
+    }
+    if (ch === '十') {
+      total += (current || 1) * 10;
+      current = 0;
+      continue;
+    }
+    if (ch === '百') {
+      total += (current || 1) * 100;
+      current = 0;
+      continue;
+    }
+    if (ch === '千') {
+      total += (current || 1) * 1000;
+      current = 0;
+      continue;
+    }
+    return null;
+  }
+  return total + current;
+}
+
+function extractEpisodeNoByText(rawText) {
+  const text = String(rawText || '');
+  const strictPatterns = [
+    /第\s*([零〇一二两三四五六七八九十百千\d]+)\s*[集话話]/iu,
+    /(?:ep|episode|e)\s*[-_.]?[\s]*0*(\d{1,4})/iu,
+    /^(\d{1,4})(?:\D|$)/u
+  ];
+
+  for (const pattern of strictPatterns) {
+    const match = text.match(pattern);
+    if (!match) continue;
+    const value = parseChineseNumber(match[1]);
+    if (Number.isFinite(value) && value > 0) return value;
+  }
+
+  const fallback = text.match(/(\d{1,4})/u);
+  if (!fallback) return null;
+  const value = Number(fallback[1]);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function parseDirectoryLinks(html, directoryUrl) {
+  const hrefMatches = [...String(html || '').matchAll(/href\s*=\s*(["'])(.*?)\1/giu)];
+  const files = [];
+  for (const match of hrefMatches) {
+    const rawHref = match[2].trim();
+    if (!rawHref || rawHref.startsWith('#') || rawHref.startsWith('?')) continue;
+    if (/^mailto:/i.test(rawHref) || /^javascript:/i.test(rawHref)) continue;
+
+    let absolute;
+    try {
+      absolute = new URL(rawHref, directoryUrl).toString();
+    } catch {
+      continue;
+    }
+
+    const pathname = decodeURIComponent(new URL(absolute).pathname);
+    if (pathname.endsWith('/')) continue;
+    if (!VIDEO_EXTENSION_RE.test(pathname)) continue;
+
+    const filename = pathname.split('/').pop() || '';
+    const episodeNo = extractEpisodeNoByText(filename) ?? extractEpisodeNoByText(pathname);
+    if (!episodeNo) continue;
+    files.push({ episodeNo, videoUrl: absolute, filename });
+  }
+
+  files.sort((a, b) => a.episodeNo - b.episodeNo || a.videoUrl.localeCompare(b.videoUrl, 'zh-CN'));
+
+  const uniqueByEpisode = new Map();
+  for (const item of files) {
+    if (!uniqueByEpisode.has(item.episodeNo)) {
+      uniqueByEpisode.set(item.episodeNo, item);
+    }
+  }
+  return [...uniqueByEpisode.values()];
 }
 
 async function querySeries({ tag, name, search, sort, page, pageSize }) {
@@ -436,6 +540,116 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 200, { message: '漫剧删除成功' });
       return;
     }
+
+    if (pathname === '/api/episodes/batch-directory' && req.method === 'POST') {
+      const body = await readBody(req);
+      const name = String(body.name || '').trim();
+      const poster = String(body.poster || '').trim();
+      const directoryUrl = String(body.directoryUrl || '').trim();
+      const tags = Array.isArray(body.tags) ? body.tags.filter(validateNonEmptyString).map((s) => s.trim()) : [];
+
+      if (!name || !poster || !directoryUrl) {
+        return sendJson(res, 400, { message: 'name、poster、directoryUrl 不能为空' });
+      }
+      if (!tags.length) {
+        return sendJson(res, 400, { message: 'tags 至少需要一个标签' });
+      }
+
+      let parsedDirectoryUrl;
+      try {
+        parsedDirectoryUrl = new URL(directoryUrl);
+      } catch {
+        return sendJson(res, 400, { message: 'directoryUrl 不是合法 URL' });
+      }
+
+      if (!/^https?:$/i.test(parsedDirectoryUrl.protocol)) {
+        return sendJson(res, 400, { message: 'directoryUrl 只支持 http/https' });
+      }
+
+      const directoryResponse = await fetch(parsedDirectoryUrl.toString());
+      if (!directoryResponse.ok) {
+        return sendJson(res, 400, { message: `读取目录失败：HTTP ${directoryResponse.status}` });
+      }
+
+      const contentType = directoryResponse.headers.get('content-type') || '';
+      if (!/text\/html|application\/xhtml\+xml/i.test(contentType)) {
+        return sendJson(res, 400, { message: '目录地址返回的不是 HTML 页面，无法解析视频列表' });
+      }
+
+      const directoryHtml = await directoryResponse.text();
+      const parsedEpisodes = parseDirectoryLinks(directoryHtml, parsedDirectoryUrl.toString());
+      if (!parsedEpisodes.length) {
+        return sendJson(res, 400, {
+          message: '目录中未识别到可导入的视频文件。请确认链接可直接访问且文件名包含集号（如第1集/第一集/EP01）。'
+        });
+      }
+
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        let titleId;
+        const existingTitleRes = await client.query('SELECT id FROM title WHERE name = $1', [name]);
+        if (existingTitleRes.rowCount) {
+          titleId = existingTitleRes.rows[0].id;
+          await client.query('UPDATE title SET cover_url = $2 WHERE id = $1', [titleId, poster]);
+        } else {
+          const titleInsert = await client.query(
+            'INSERT INTO title(name, cover_url) VALUES ($1, $2) RETURNING id',
+            [name, poster]
+          );
+          titleId = titleInsert.rows[0].id;
+        }
+
+        const tagRows = await client.query('SELECT id, tag_name FROM tag WHERE tag_name = ANY($1)', [tags]);
+        if (!tagRows.rowCount) {
+          await client.query('ROLLBACK');
+          return sendJson(res, 400, { message: '所选标签不存在，请先创建标签' });
+        }
+
+        const tagIdMap = new Map(tagRows.rows.map((row) => [row.tag_name, row.id]));
+        await client.query('DELETE FROM title_tag WHERE title_id = $1', [titleId]);
+        for (const tagName of tags) {
+          if (!tagIdMap.has(tagName)) continue;
+          await client.query('INSERT INTO title_tag(title_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [titleId, tagIdMap.get(tagName)]);
+        }
+
+        let inserted = 0;
+        let updated = 0;
+
+        for (const episode of parsedEpisodes) {
+          const result = await client.query(
+            `INSERT INTO episode(title_id, episode_no, episode_url)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (title_id, episode_no)
+             DO UPDATE SET episode_url = EXCLUDED.episode_url
+             RETURNING (xmax = 0) AS inserted`,
+            [titleId, episode.episodeNo, episode.videoUrl]
+          );
+          if (result.rows[0]?.inserted) inserted += 1;
+          else updated += 1;
+        }
+
+        await client.query('COMMIT');
+        sendJson(res, 201, {
+          message: `批量导入完成，共识别 ${parsedEpisodes.length} 集`,
+          data: {
+            total: parsedEpisodes.length,
+            inserted,
+            updated,
+            episodes: parsedEpisodes.map((item) => ({ episodeNo: item.episodeNo, videoUrl: item.videoUrl }))
+          }
+        });
+      } catch (e) {
+        await client.query('ROLLBACK');
+        if (e.code === '23505') return sendJson(res, 409, { message: '漫剧名称冲突，请更换名称' });
+        throw e;
+      } finally {
+        client.release();
+      }
+      return;
+    }
+
 
     if (pathname === '/api/episodes' && req.method === 'POST') {
       const body = await readBody(req);

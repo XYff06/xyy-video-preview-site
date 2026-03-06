@@ -30,6 +30,7 @@
    - `PATCH /api/titles/:titleName`
    - `DELETE /api/titles/:titleName`
    - `PATCH /api/episodes`
+   - `POST /api/episodes/batch-directory`（按目录批量导入）
 
 > 当前后端已改为 PostgreSQL 持久化存储。
 
