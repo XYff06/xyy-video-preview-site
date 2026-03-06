@@ -4,8 +4,40 @@ const path = require('path');
 const { Pool } = require('pg');
 
 const HOST = '0.0.0.0';
-const PORT = Number(process.env.PORT) || 4173;
 const ROOT_DIR = __dirname;
+
+function loadEnvFile(filePath) {
+  if (!fs.existsSync(filePath)) return;
+  const content = fs.readFileSync(filePath, 'utf8');
+  const lines = content.split(/\r?\n/);
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    const eqIndex = trimmed.indexOf('=');
+    if (eqIndex <= 0) continue;
+
+    const rawKey = trimmed.slice(0, eqIndex).trim();
+    if (!rawKey) continue;
+
+    if (typeof process.env[rawKey] === 'string') continue;
+
+    let rawValue = trimmed.slice(eqIndex + 1).trim();
+    if (
+      (rawValue.startsWith('"') && rawValue.endsWith('"')) ||
+      (rawValue.startsWith("'") && rawValue.endsWith("'"))
+    ) {
+      rawValue = rawValue.slice(1, -1);
+    }
+
+    process.env[rawKey] = rawValue;
+  }
+}
+
+loadEnvFile(path.join(ROOT_DIR, '.env'));
+
+const PORT = Number(process.env.PORT) || 4173;
 
 function optionalEnv(name) {
   const value = process.env[name];
