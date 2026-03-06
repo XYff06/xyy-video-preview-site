@@ -13,6 +13,9 @@ const state = {
   homeLoading: false,
   homeError: null,
   selectedEpisode: null,
+  episodePage: 1,
+  episodePageSize: 10,
+  detailSeriesName: '',
   tagExpanded: false,
   loading: true,
   error: null,
@@ -530,6 +533,14 @@ function renderDetail(container, series) {
     state.selectedEpisode = series.episodes[0].episode;
   }
 
+  if (state.detailSeriesName !== series.name) {
+    const selectedIndex = series.episodes.findIndex((ep) => ep.episode === state.selectedEpisode);
+    state.episodePage = selectedIndex >= 0
+      ? Math.floor(selectedIndex / state.episodePageSize) + 1
+      : 1;
+    state.detailSeriesName = series.name;
+  }
+
   const topRowLeft = document.getElementById('top-row-left');
   topRowLeft.innerHTML = '<button id="back-home" class="back-btn">⬅ 首页</button>';
   container.innerHTML = document.getElementById('detail-template').innerHTML;
@@ -540,7 +551,13 @@ function renderDetail(container, series) {
   };
 
   const episodeRow = document.getElementById('episode-row');
-  series.episodes.forEach((ep) => {
+  const totalEpisodePages = Math.max(1, Math.ceil(series.episodes.length / state.episodePageSize));
+  state.episodePage = Math.min(totalEpisodePages, Math.max(1, state.episodePage));
+
+  const pageStartIndex = (state.episodePage - 1) * state.episodePageSize;
+  const visibleEpisodes = series.episodes.slice(pageStartIndex, pageStartIndex + state.episodePageSize);
+
+  visibleEpisodes.forEach((ep) => {
     const tab = document.createElement('button');
     tab.className = `episode-tab ${state.selectedEpisode === ep.episode ? 'active' : ''}`;
     tab.textContent = `第${ep.episode}集`;
@@ -550,6 +567,23 @@ function renderDetail(container, series) {
     };
     episodeRow.appendChild(tab);
   });
+
+  const prevEpisodePageBtn = document.getElementById('episode-prev');
+  const nextEpisodePageBtn = document.getElementById('episode-next');
+  prevEpisodePageBtn.disabled = state.episodePage <= 1;
+  nextEpisodePageBtn.disabled = state.episodePage >= totalEpisodePages;
+
+  prevEpisodePageBtn.onclick = () => {
+    if (state.episodePage <= 1) return;
+    state.episodePage -= 1;
+    render();
+  };
+
+  nextEpisodePageBtn.onclick = () => {
+    if (state.episodePage >= totalEpisodePages) return;
+    state.episodePage += 1;
+    render();
+  };
 
   const selected = series.episodes.find((e) => e.episode === state.selectedEpisode) || series.episodes[0];
   const maxEpisode = series.episodes.reduce((max, ep) => Math.max(max, Number(ep.episode) || 0), 0);
