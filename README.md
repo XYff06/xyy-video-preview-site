@@ -53,30 +53,61 @@ psql --version
 npm install
 ```
 
-### 3.2 初始化数据库
+### 3.2 初始化数据库（从终端到建表成功）
 
-1) 创建数据库（示例名：`video_preview`）：
+按下面步骤操作即可：
+
+1) 进入 PostgreSQL 终端：
+
+```bash
+psql -U postgres
+```
+
+2) 在 `psql` 中创建数据库：
 
 ```sql
 CREATE DATABASE video_preview WITH ENCODING = 'UTF8';
 ```
 
-2) 导入建表脚本：
+3) 切换到新库并导入建表脚本：
 
-```bash
-psql -U postgres -d video_preview -f db/schema.sql
+```sql
+\c video_preview
+\i db/schema.sql
 ```
 
-> 如果你已进入 `psql` 交互终端，也可以用：
->
-> ```sql
-> \c video_preview
-> \i db/schema.sql
-> ```
+4) 验证表是否创建成功（看到表列表即可）：
 
-### 3.3 配置环境变量（重点）
+```sql
+\dt
+```
 
-服务端读取以下变量（优先级见下一节）：
+> 说明：如果你是在项目根目录外进入 `psql`，`\i db/schema.sql` 可能找不到文件。可改用绝对路径，例如 `\i /workspace/xyy-video-preview-site/db/schema.sql`。
+
+### 3.3 使用配置文件管理环境变量（推荐）
+
+为了避免每次手动 `export`，项目支持在根目录使用 `.env` 文件。启动时会自动读取（系统环境变量优先）。
+
+1) 新建 `.env` 文件（可从 `.env.example` 复制）：
+
+```bash
+cp .env.example .env
+```
+
+2) 按需修改 `.env`：
+
+```dotenv
+PGHOST=127.0.0.1
+PGPORT=5432
+PGUSER=postgres
+PGPASSWORD=你的数据库密码
+PGDATABASE=video_preview
+PORT=4173
+# 或使用连接串（设置后优先于上面的分项配置）
+# DATABASE_URL=postgresql://postgres:你的数据库密码@127.0.0.1:5432/video_preview
+```
+
+服务端会读取以下变量（优先级见下一节）：
 
 - `DATABASE_URL`
 - `PGHOST`
@@ -85,59 +116,6 @@ psql -U postgres -d video_preview -f db/schema.sql
 - `PGPASSWORD`（或 `POSTGRES_PASSWORD`）
 - `PGDATABASE`
 - `PORT`（服务端口，默认 `4173`）
-
-#### macOS / Linux（bash/zsh）
-
-```bash
-export PGHOST=127.0.0.1
-export PGPORT=5432
-export PGUSER=postgres
-export PGPASSWORD=你的数据库密码
-export PGDATABASE=video_preview
-export PORT=4173
-```
-
-或使用连接串：
-
-```bash
-export DATABASE_URL='postgresql://postgres:你的数据库密码@127.0.0.1:5432/video_preview'
-```
-
-#### Windows PowerShell
-
-```powershell
-$env:PGHOST = "127.0.0.1"
-$env:PGPORT = "5432"
-$env:PGUSER = "postgres"
-$env:PGPASSWORD = "你的数据库密码"
-$env:PGDATABASE = "video_preview"
-$env:PORT = "4173"
-```
-
-连接串写法：
-
-```powershell
-$env:DATABASE_URL = "postgresql://postgres:你的数据库密码@127.0.0.1:5432/video_preview"
-```
-
-#### Windows CMD
-
-```cmd
-set PGHOST=127.0.0.1
-set PGPORT=5432
-set PGUSER=postgres
-set PGPASSWORD=你的数据库密码
-set PGDATABASE=video_preview
-set PORT=4173
-```
-
-连接串写法：
-
-```cmd
-set DATABASE_URL=postgresql://postgres:你的数据库密码@127.0.0.1:5432/video_preview
-```
-
-> 注意：以上 `set` / `$env:` 仅对当前终端会话生效。若想长期生效，可在系统环境变量中配置。
 
 ### 3.4 启动项目
 
