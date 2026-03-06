@@ -1,54 +1,17 @@
-const fmt = (iso) => new Date(iso).toLocaleString('zh-CN', { hour12: false });
-
-const state = {
-  allSeries: [],
-  allTags: [],
-  selectedTag: null,
-  searchQuery: '',
-  sortBy: 'updated_desc',
-  currentPage: 1,
-  pageSize: 25,
-  homeSeries: [],
-  homeTotal: 0,
-  homeLoading: false,
-  homeError: null,
-  selectedEpisode: null,
-  episodePage: 1,
-  episodePageSize: 10,
-  detailSeriesName: '',
-  tagExpanded: false,
-  loading: true,
-  error: null,
-  activeAdminTab: 'tag',
-  adminModalOpen: false,
-  flashMessage: '',
-  flashAutoCloseTimeout: null,
-  flashVersion: 0,
-  flashVersionRendered: 0,
-  activeTagAction: 'create',
-  activeTitleAction: 'create',
-  activeEpisodeAction: 'create'
-};
+import { FLASH_AUTO_CLOSE_MS } from './src/config/constants.js';
+import { appState } from './src/state/appState.js';
+import { apiFetch } from './src/services/http.js';
+import { formatDateTime } from './src/utils/date.js';
+import { bindMultiSelectSummary, escapeHtml, getTagMultiSelectHtml, validateTagSelection } from './src/utils/dom.js';
+import { fillEpisodeSelectByTitle, getAllTags, getEpisodeOptionsByTitle, normalizeEpisodes } from './src/utils/series.js';
 
 function currentPathName() {
   return decodeURIComponent(location.pathname.slice(1));
 }
 
-async function apiFetch(url, options = {}) {
-  const response = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options
-  });
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload.message || '请求失败');
-  }
-  return payload;
-}
-
 async function loadTags() {
   const payload = await apiFetch('/api/tags');
-  state.allTags = payload.data;
+  appState.allTags = payload.data;
 }
 
 async function loadSeries() {
@@ -57,16 +20,17 @@ async function loadSeries() {
       apiFetch('/api/series?page=1&pageSize=10000'),
       loadTags()
     ]);
-    state.allSeries = seriesPayload.data.map((item) => ({
+
+    appState.allSeries = seriesPayload.data.map((item) => ({
       ...item,
       tags: new Set(item.tags),
       episodes: normalizeEpisodes(item.episodes || [])
     }));
-    state.loading = false;
-    state.error = null;
+    appState.loading = false;
+    appState.error = null;
   } catch (error) {
-    state.loading = false;
-    state.error = error.message;
+    appState.loading = false;
+    appState.error = error.message;
   }
 
   render();
@@ -77,173 +41,62 @@ async function loadSeries() {
 }
 
 async function loadHomeSeries() {
-  state.homeLoading = true;
-  state.homeError = null;
+  appState.homeLoading = true;
+  appState.homeError = null;
   render();
 
   const params = new URLSearchParams();
-  params.set('page', String(state.currentPage));
-  params.set('pageSize', String(state.pageSize));
-  if (state.selectedTag) params.set('tag', state.selectedTag);
-  if (state.searchQuery.trim()) params.set('search', state.searchQuery.trim());
-  params.set('sort', state.sortBy);
+  params.set('page', String(appState.currentPage));
+  params.set('pageSize', String(appState.pageSize));
+  if (appState.selectedTag) params.set('tag', appState.selectedTag);
+  if (appState.searchQuery.trim()) params.set('search', appState.searchQuery.trim());
+  params.set('sort', appState.sortBy);
 
   try {
     const payload = await apiFetch(`/api/series?${params.toString()}`);
-    state.homeSeries = payload.data.map((item) => ({
+    appState.homeSeries = payload.data.map((item) => ({
       ...item,
       episodes: normalizeEpisodes(item.episodes || [])
     }));
-    state.homeTotal = payload.pagination?.total ?? payload.data.length;
-    state.currentPage = payload.pagination?.page ?? state.currentPage;
-    state.homeLoading = false;
-    state.homeError = null;
+    appState.homeTotal = payload.pagination?.total ?? payload.data.length;
+    appState.currentPage = payload.pagination?.page ?? appState.currentPage;
+    appState.homeLoading = false;
+    appState.homeError = null;
   } catch (error) {
-    state.homeSeries = [];
-    state.homeTotal = 0;
-    state.homeLoading = false;
-    state.homeError = error.message;
+    appState.homeSeries = [];
+    appState.homeTotal = 0;
+    appState.homeLoading = false;
+    appState.homeError = error.message;
   }
 
   render();
 }
 
-function getAllTags() {
-  if (state.allTags.length) return [...state.allTags];
-  return [...new Set(state.allSeries.flatMap((item) => [...item.tags]))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
-}
-
-
-function escapeHtml(value) {
-  return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function normalizeEpisodes(episodes) {
-  const normalized = new Map();
-
-  episodes.forEach((episode) => {
-    const episodeNo = Number(episode.episode);
-    if (!Number.isFinite(episodeNo)) return;
-
-    const current = normalized.get(episodeNo);
-    if (!current) {
-      normalized.set(episodeNo, { ...episode, episode: episodeNo });
-      return;
-    }
-
-    const currentUpdatedAt = new Date(current.updatedAt || 0).getTime();
-    const nextUpdatedAt = new Date(episode.updatedAt || 0).getTime();
-    if (nextUpdatedAt >= currentUpdatedAt) {
-      normalized.set(episodeNo, { ...episode, episode: episodeNo });
-    }
-  });
-
-  return [...normalized.values()].sort((a, b) => a.episode - b.episode);
-}
-
-function getEpisodeOptionsByTitle(titleName) {
-  const target = state.allSeries.find((series) => series.name === titleName);
-  if (!target) return [];
-  return normalizeEpisodes(target.episodes);
-}
-
-function getTagMultiSelectHtml(fieldName, tags, selectedTags = []) {
-  if (!tags.length) {
-    return '<div class="multi-select-empty">暂无可选标签</div>';
-  }
-
-  const selected = new Set(selectedTags);
-  const selectedText = selected.size
-    ? [...selected].map((tag) => escapeHtml(tag)).join('、')
-    : '选择标签(可多选)';
-
-  return `
-    <details class="multi-select" data-multi-select>
-      <summary class="multi-select-summary" data-multi-summary>${selectedText}</summary>
-      <div class="multi-select-list">
-        ${tags.map((tag) => `
-          <label class="multi-select-item">
-            <input type="checkbox" name="${fieldName}" value="${escapeHtml(tag)}" ${selected.has(tag) ? 'checked' : ''} />
-            <span>${escapeHtml(tag)}</span>
-          </label>
-        `).join('')}
-      </div>
-    </details>
-  `;
-}
-
-function bindMultiSelectSummary(scope) {
-  scope.querySelectorAll('[data-multi-select]').forEach((multiSelect) => {
-    const summary = multiSelect.querySelector('[data-multi-summary]');
-    if (!summary) return;
-
-    const updateSummary = () => {
-      const checked = [...multiSelect.querySelectorAll('input[type="checkbox"]:checked')].map((input) => input.value);
-      summary.textContent = checked.length ? checked.join('、') : '选择标签(可多选)';
-    };
-
-    multiSelect.querySelectorAll('input[type="checkbox"]').forEach((input) => {
-      if (input.dataset.summaryBound === '1') return;
-      input.addEventListener('change', updateSummary);
-      input.dataset.summaryBound = '1';
-    });
-
-    updateSummary();
-  });
-}
-
-function fillEpisodeSelectByTitle(titleSelect, episodeSelect, placeholderText) {
-  const episodes = getEpisodeOptionsByTitle(titleSelect.value);
-  episodeSelect.innerHTML = `<option value="">${placeholderText}</option>${episodes
-    .map((episode) => `<option value="${episode.episode}">第${episode.episode}集</option>`)
-    .join('')}`;
-}
-
-function setFieldError(errorNode, message = '') {
-  if (!errorNode) return;
-  errorNode.textContent = message;
-  errorNode.classList.toggle('hidden', !message);
-}
-
-function validateTagSelection(form, fieldName, errorNode, message) {
-  const checkboxes = [...form.querySelectorAll(`input[name="${fieldName}"]`)];
-  if (checkboxes.length === 0) return false;
-
-  const hasSelection = checkboxes.some((checkbox) => checkbox.checked);
-  setFieldError(errorNode, hasSelection ? '' : message);
-  return hasSelection;
-}
-
 function getFlashHtml() {
-  if (!state.flashMessage) return '';
+  if (!appState.flashMessage) return '';
   return `
     <div class="flash-msg" role="status">
-      <span class="flash-text">${state.flashMessage}</span>
+      <span class="flash-text">${appState.flashMessage}</span>
       <button type="button" class="flash-close" id="flash-close-btn" aria-label="关闭提示">✕</button>
     </div>
   `;
 }
 
 function setFlashMessage(message) {
-  state.flashMessage = message;
-  state.flashVersion += 1;
+  appState.flashMessage = message;
+  appState.flashVersion += 1;
 }
 
 function clearFlashMessage() {
-  state.flashMessage = '';
-  if (state.flashAutoCloseTimeout) {
-    clearTimeout(state.flashAutoCloseTimeout);
-    state.flashAutoCloseTimeout = null;
+  appState.flashMessage = '';
+  if (appState.flashAutoCloseTimeout) {
+    clearTimeout(appState.flashAutoCloseTimeout);
+    appState.flashAutoCloseTimeout = null;
   }
 }
 
 function getAdminModalHtml() {
-  if (!state.adminModalOpen) return '';
+  if (!appState.adminModalOpen) return '';
   return `
     <div class="modal-mask" id="admin-modal-mask">
       <section class="admin-modal" role="dialog" aria-modal="true" aria-label="管理">
@@ -252,9 +105,9 @@ function getAdminModalHtml() {
           <button id="close-admin" class="icon-btn" type="button">✕</button>
         </header>
         <div class="admin-modal-tabs">
-          <button class="admin-nav-btn ${state.activeAdminTab === 'tag' ? 'active' : ''}" data-admin-tab="tag">标签管理</button>
-          <button class="admin-nav-btn ${state.activeAdminTab === 'title' ? 'active' : ''}" data-admin-tab="title">漫剧管理</button>
-          <button class="admin-nav-btn ${state.activeAdminTab === 'episode' ? 'active' : ''}" data-admin-tab="episode">内容管理</button>
+          <button class="admin-nav-btn ${appState.activeAdminTab === 'tag' ? 'active' : ''}" data-admin-tab="tag">标签管理</button>
+          <button class="admin-nav-btn ${appState.activeAdminTab === 'title' ? 'active' : ''}" data-admin-tab="title">漫剧管理</button>
+          <button class="admin-nav-btn ${appState.activeAdminTab === 'episode' ? 'active' : ''}" data-admin-tab="episode">内容管理</button>
         </div>
         <section id="admin-content"></section>
       </section>
@@ -265,13 +118,13 @@ function getAdminModalHtml() {
 function render() {
   const app = document.getElementById('app');
 
-  if (state.loading) {
+  if (appState.loading) {
     app.innerHTML = '<p>正在加载剧集数据...</p>';
     return;
   }
 
-  if (state.error) {
-    app.innerHTML = `<p>加载失败：${state.error}</p>`;
+  if (appState.error) {
+    app.innerHTML = `<p>加载失败：${appState.error}</p>`;
     return;
   }
 
@@ -292,20 +145,20 @@ function render() {
   `;
 
   document.getElementById('open-admin').onclick = () => {
-    state.adminModalOpen = true;
+    appState.adminModalOpen = true;
     render();
   };
 
   const flashCloseBtn = document.getElementById('flash-close-btn');
-  if (state.flashMessage && state.flashVersionRendered !== state.flashVersion) {
-    if (state.flashAutoCloseTimeout) {
-      clearTimeout(state.flashAutoCloseTimeout);
+  if (appState.flashMessage && appState.flashVersionRendered !== appState.flashVersion) {
+    if (appState.flashAutoCloseTimeout) {
+      clearTimeout(appState.flashAutoCloseTimeout);
     }
-    state.flashVersionRendered = state.flashVersion;
-    state.flashAutoCloseTimeout = setTimeout(() => {
+    appState.flashVersionRendered = appState.flashVersion;
+    appState.flashAutoCloseTimeout = setTimeout(() => {
       clearFlashMessage();
       render();
-    }, 5000);
+    }, FLASH_AUTO_CLOSE_MS);
   }
   if (flashCloseBtn) {
     flashCloseBtn.onclick = () => {
@@ -314,21 +167,21 @@ function render() {
     };
   }
 
-  if (state.adminModalOpen) {
+  if (appState.adminModalOpen) {
     document.getElementById('close-admin').onclick = () => {
-      state.adminModalOpen = false;
+      appState.adminModalOpen = false;
       render();
     };
 
     document.getElementById('admin-modal-mask').onclick = (event) => {
       if (event.target.id !== 'admin-modal-mask') return;
-      state.adminModalOpen = false;
+      appState.adminModalOpen = false;
       render();
     };
 
     document.querySelectorAll('[data-admin-tab]').forEach((btn) => {
       btn.onclick = () => {
-        state.activeAdminTab = btn.dataset.adminTab;
+        appState.activeAdminTab = btn.dataset.adminTab;
         render();
       };
     });
@@ -339,7 +192,7 @@ function render() {
   const pageContent = document.getElementById('page-content');
   const activeName = currentPathName();
   if (activeName) {
-    const series = state.allSeries.find((s) => s.name === activeName);
+    const series = appState.allSeries.find((s) => s.name === activeName);
     if (series) {
       renderDetail(pageContent, series);
     } else {
@@ -363,50 +216,50 @@ function renderHome(container) {
   searchBar.className = 'home-search-bar';
   searchBar.innerHTML = `
     <form id="global-search-form" class="search-form">
-      <input id="global-search" class="global-search" type="search" placeholder="全局搜索：输入漫剧名称" value="${escapeHtml(state.searchQuery)}" />
+      <input id="global-search" class="global-search" type="search" placeholder="全局搜索：输入漫剧名称" value="${escapeHtml(appState.searchQuery)}" />
       <button type="submit" class="primary-btn search-btn">搜索</button>
       <select id="global-sort" class="global-sort" aria-label="排序依据">
-        <option value="updated_desc" ${state.sortBy === 'updated_desc' ? 'selected' : ''}>最后更新时间（倒序）</option>
-        <option value="updated_asc" ${state.sortBy === 'updated_asc' ? 'selected' : ''}>最后更新时间（顺序）</option>
-        <option value="ingested_asc" ${state.sortBy === 'ingested_asc' ? 'selected' : ''}>最早入库时间（顺序）</option>
-        <option value="ingested_desc" ${state.sortBy === 'ingested_desc' ? 'selected' : ''}>最早入库时间（倒序）</option>
-        <option value="name_asc" ${state.sortBy === 'name_asc' ? 'selected' : ''}>名称（顺序）</option>
-        <option value="name_desc" ${state.sortBy === 'name_desc' ? 'selected' : ''}>名称（倒序）</option>
+        <option value="updated_desc" ${appState.sortBy === 'updated_desc' ? 'selected' : ''}>最后更新时间（倒序）</option>
+        <option value="updated_asc" ${appState.sortBy === 'updated_asc' ? 'selected' : ''}>最后更新时间（顺序）</option>
+        <option value="ingested_asc" ${appState.sortBy === 'ingested_asc' ? 'selected' : ''}>最早入库时间（顺序）</option>
+        <option value="ingested_desc" ${appState.sortBy === 'ingested_desc' ? 'selected' : ''}>最早入库时间（倒序）</option>
+        <option value="name_asc" ${appState.sortBy === 'name_asc' ? 'selected' : ''}>名称（顺序）</option>
+        <option value="name_desc" ${appState.sortBy === 'name_desc' ? 'selected' : ''}>名称（倒序）</option>
       </select>
     </form>
   `;
   homePage.insertBefore(searchBar, grid);
 
-  const allTags = getAllTags();
-  const visibleTags = state.tagExpanded ? allTags : allTags.slice(0, 5);
-  const selectedHiddenTag = !state.tagExpanded && state.selectedTag !== null && !visibleTags.includes(state.selectedTag);
+  const allTags = getAllTags(appState.allSeries, appState.allTags);
+  const visibleTags = appState.tagExpanded ? allTags : allTags.slice(0, 5);
+  const selectedHiddenTag = !appState.tagExpanded && appState.selectedTag !== null && !visibleTags.includes(appState.selectedTag);
 
   const navItems = [
     { type: 'all', label: '全部' },
     ...visibleTags.map((tag) => ({ type: 'tag', label: tag })),
-    { type: 'more', label: state.tagExpanded ? '收起' : '更多' }
+    { type: 'more', label: appState.tagExpanded ? '收起' : '更多' }
   ];
 
   navItems.forEach((item) => {
     const btn = document.createElement('button');
     const isActive = item.type === 'all'
-      ? state.selectedTag === null
+      ? appState.selectedTag === null
       : item.type === 'tag'
-        ? state.selectedTag === item.label
-        : state.tagExpanded || selectedHiddenTag;
+        ? appState.selectedTag === item.label
+        : appState.tagExpanded || selectedHiddenTag;
 
     btn.className = `category-pill ${isActive ? 'active' : ''}`;
     btn.textContent = item.label;
 
     btn.onclick = () => {
       if (item.type === 'all') {
-        state.selectedTag = null;
+        appState.selectedTag = null;
       } else if (item.type === 'tag') {
-        state.selectedTag = item.label;
+        appState.selectedTag = item.label;
       } else {
-        state.tagExpanded = !state.tagExpanded;
+        appState.tagExpanded = !appState.tagExpanded;
       }
-      state.currentPage = 1;
+      appState.currentPage = 1;
       loadHomeSeries();
     };
     categoryList.appendChild(btn);
@@ -417,28 +270,28 @@ function renderHome(container) {
   const sortSelect = document.getElementById('global-sort');
   searchForm.onsubmit = (event) => {
     event.preventDefault();
-    state.searchQuery = searchInput.value;
-    state.sortBy = sortSelect.value;
-    state.currentPage = 1;
+    appState.searchQuery = searchInput.value;
+    appState.sortBy = sortSelect.value;
+    appState.currentPage = 1;
     loadHomeSeries();
   };
 
   sortSelect.onchange = () => {
-    state.sortBy = sortSelect.value;
-    state.currentPage = 1;
+    appState.sortBy = sortSelect.value;
+    appState.currentPage = 1;
     loadHomeSeries();
   };
 
-  if (state.homeError) {
-    grid.innerHTML = `<p class="empty-state">加载失败：${state.homeError}</p>`;
+  if (appState.homeError) {
+    grid.innerHTML = `<p class="empty-state">加载失败：${appState.homeError}</p>`;
   }
 
-  if (state.homeLoading) {
+  if (appState.homeLoading) {
     grid.innerHTML = '<p class="empty-state">正在加载列表...</p>';
   }
 
-  const totalPages = Math.max(1, Math.ceil(state.homeTotal / state.pageSize));
-  const pageSeries = state.homeSeries;
+  const totalPages = Math.max(1, Math.ceil(appState.homeTotal / appState.pageSize));
+  const pageSeries = appState.homeSeries;
 
   pageSeries.forEach((series) => {
       const maxEpisode = Math.max(...series.episodes.map((ep) => Number(ep.episode) || 0), 0);
@@ -448,11 +301,11 @@ function renderHome(container) {
       card.innerHTML = `
         <div class="poster" style="background-image:url('${series.poster}')"></div>
         <p class="poster-title">${escapeHtml(series.name)}</p>
-        <p class="poster-meta">最大集数：${maxEpisode}<br>总集数：${totalEpisodes}<br>最后更新时间：<br>${escapeHtml(fmt(series.updatedAt))}<br>入库时间：<br>${escapeHtml(fmt(series.firstIngestedAt))}</p>
+        <p class="poster-meta">最大集数：${maxEpisode}<br>总集数：${totalEpisodes}<br>最后更新时间：<br>${escapeHtml(formatDateTime(series.updatedAt))}<br>入库时间：<br>${escapeHtml(formatDateTime(series.firstIngestedAt))}</p>
       `;
       card.onclick = () => {
         history.pushState({}, '', `/${encodeURIComponent(series.name)}`);
-        state.selectedEpisode = series.episodes[0]?.episode ?? null;
+        appState.selectedEpisode = series.episodes[0]?.episode ?? null;
         render();
       };
       grid.appendChild(card);
@@ -464,7 +317,7 @@ function renderHome(container) {
 
   const buildPageList = () => {
     const pages = new Set([1, totalPages]);
-    for (let i = state.currentPage - 2; i <= state.currentPage + 2; i += 1) {
+    for (let i = appState.currentPage - 2; i <= appState.currentPage + 2; i += 1) {
       if (i >= 1 && i <= totalPages) pages.add(i);
     }
     return [...pages].sort((a, b) => a - b);
@@ -474,19 +327,19 @@ function renderHome(container) {
   const pagination = document.createElement('div');
   pagination.className = 'pagination';
   pagination.innerHTML = `
-    <button type="button" class="page-btn" data-page="prev" ${state.currentPage === 1 ? 'disabled' : ''}>上一页</button>
+    <button type="button" class="page-btn" data-page="prev" ${appState.currentPage === 1 ? 'disabled' : ''}>上一页</button>
     <div class="page-numbers">
       ${pageItems.map((pageNo, idx) => {
         const prev = pageItems[idx - 1];
         const ellipsis = prev && pageNo - prev > 1 ? '<span class="page-ellipsis">…</span>' : '';
-        return `${ellipsis}<button type="button" class="page-number-btn ${pageNo === state.currentPage ? 'active' : ''}" data-page-no="${pageNo}">${pageNo}</button>`;
+        return `${ellipsis}<button type="button" class="page-number-btn ${pageNo === appState.currentPage ? 'active' : ''}" data-page-no="${pageNo}">${pageNo}</button>`;
       }).join('')}
     </div>
-    <button type="button" class="page-btn" data-page="next" ${state.currentPage === totalPages ? 'disabled' : ''}>下一页</button>
-    <span class="page-meta">第 ${state.currentPage} / ${totalPages} 页（共 ${state.homeTotal} 个）</span>
+    <button type="button" class="page-btn" data-page="next" ${appState.currentPage === totalPages ? 'disabled' : ''}>下一页</button>
+    <span class="page-meta">第 ${appState.currentPage} / ${totalPages} 页（共 ${appState.homeTotal} 个）</span>
     <form class="page-jump-form" id="page-jump-form">
       <label for="page-jump-input">跳转</label>
-      <input id="page-jump-input" type="number" min="1" max="${totalPages}" value="${state.currentPage}" />
+      <input id="page-jump-input" type="number" min="1" max="${totalPages}" value="${appState.currentPage}" />
       <button type="submit" class="page-jump-btn">确定</button>
     </form>
   `;
@@ -494,21 +347,21 @@ function renderHome(container) {
   const prevBtn = pagination.querySelector('[data-page="prev"]');
   const nextBtn = pagination.querySelector('[data-page="next"]');
   prevBtn.onclick = () => {
-    if (state.currentPage <= 1) return;
-    state.currentPage -= 1;
+    if (appState.currentPage <= 1) return;
+    appState.currentPage -= 1;
     loadHomeSeries();
   };
   nextBtn.onclick = () => {
-    if (state.currentPage >= totalPages) return;
-    state.currentPage += 1;
+    if (appState.currentPage >= totalPages) return;
+    appState.currentPage += 1;
     loadHomeSeries();
   };
 
   pagination.querySelectorAll('[data-page-no]').forEach((btn) => {
     btn.onclick = () => {
       const pageNo = Number(btn.dataset.pageNo);
-      if (!Number.isFinite(pageNo) || pageNo === state.currentPage) return;
-      state.currentPage = pageNo;
+      if (!Number.isFinite(pageNo) || pageNo === appState.currentPage) return;
+      appState.currentPage = pageNo;
       loadHomeSeries();
     };
   });
@@ -520,8 +373,8 @@ function renderHome(container) {
     const nextPage = Number(input.value);
     if (!Number.isFinite(nextPage)) return;
     const safePage = Math.min(totalPages, Math.max(1, Math.floor(nextPage)));
-    if (safePage === state.currentPage) return;
-    state.currentPage = safePage;
+    if (safePage === appState.currentPage) return;
+    appState.currentPage = safePage;
     loadHomeSeries();
   };
 
@@ -529,16 +382,16 @@ function renderHome(container) {
 }
 
 function renderDetail(container, series) {
-  if (series.episodes.length > 0 && !series.episodes.some((ep) => ep.episode === state.selectedEpisode)) {
-    state.selectedEpisode = series.episodes[0].episode;
+  if (series.episodes.length > 0 && !series.episodes.some((ep) => ep.episode === appState.selectedEpisode)) {
+    appState.selectedEpisode = series.episodes[0].episode;
   }
 
-  if (state.detailSeriesName !== series.name) {
-    const selectedIndex = series.episodes.findIndex((ep) => ep.episode === state.selectedEpisode);
-    state.episodePage = selectedIndex >= 0
-      ? Math.floor(selectedIndex / state.episodePageSize) + 1
+  if (appState.detailSeriesName !== series.name) {
+    const selectedIndex = series.episodes.findIndex((ep) => ep.episode === appState.selectedEpisode);
+    appState.episodePage = selectedIndex >= 0
+      ? Math.floor(selectedIndex / appState.episodePageSize) + 1
       : 1;
-    state.detailSeriesName = series.name;
+    appState.detailSeriesName = series.name;
   }
 
   const topRowLeft = document.getElementById('top-row-left');
@@ -551,18 +404,18 @@ function renderDetail(container, series) {
   };
 
   const episodeRow = document.getElementById('episode-row');
-  const totalEpisodePages = Math.max(1, Math.ceil(series.episodes.length / state.episodePageSize));
-  state.episodePage = Math.min(totalEpisodePages, Math.max(1, state.episodePage));
+  const totalEpisodePages = Math.max(1, Math.ceil(series.episodes.length / appState.episodePageSize));
+  appState.episodePage = Math.min(totalEpisodePages, Math.max(1, appState.episodePage));
 
-  const pageStartIndex = (state.episodePage - 1) * state.episodePageSize;
-  const visibleEpisodes = series.episodes.slice(pageStartIndex, pageStartIndex + state.episodePageSize);
+  const pageStartIndex = (appState.episodePage - 1) * appState.episodePageSize;
+  const visibleEpisodes = series.episodes.slice(pageStartIndex, pageStartIndex + appState.episodePageSize);
 
   visibleEpisodes.forEach((ep) => {
     const tab = document.createElement('button');
-    tab.className = `episode-tab ${state.selectedEpisode === ep.episode ? 'active' : ''}`;
+    tab.className = `episode-tab ${appState.selectedEpisode === ep.episode ? 'active' : ''}`;
     tab.textContent = `第${ep.episode}集`;
     tab.onclick = () => {
-      state.selectedEpisode = ep.episode;
+      appState.selectedEpisode = ep.episode;
       render();
     };
     episodeRow.appendChild(tab);
@@ -570,22 +423,22 @@ function renderDetail(container, series) {
 
   const prevEpisodePageBtn = document.getElementById('episode-prev');
   const nextEpisodePageBtn = document.getElementById('episode-next');
-  prevEpisodePageBtn.disabled = state.episodePage <= 1;
-  nextEpisodePageBtn.disabled = state.episodePage >= totalEpisodePages;
+  prevEpisodePageBtn.disabled = appState.episodePage <= 1;
+  nextEpisodePageBtn.disabled = appState.episodePage >= totalEpisodePages;
 
   prevEpisodePageBtn.onclick = () => {
-    if (state.episodePage <= 1) return;
-    state.episodePage -= 1;
+    if (appState.episodePage <= 1) return;
+    appState.episodePage -= 1;
     render();
   };
 
   nextEpisodePageBtn.onclick = () => {
-    if (state.episodePage >= totalEpisodePages) return;
-    state.episodePage += 1;
+    if (appState.episodePage >= totalEpisodePages) return;
+    appState.episodePage += 1;
     render();
   };
 
-  const selected = series.episodes.find((e) => e.episode === state.selectedEpisode) || series.episodes[0];
+  const selected = series.episodes.find((e) => e.episode === appState.selectedEpisode) || series.episodes[0];
   const maxEpisode = series.episodes.reduce((max, ep) => Math.max(max, Number(ep.episode) || 0), 0);
   const totalEpisodes = series.episodes.length;
   const player = document.getElementById('player');
@@ -604,32 +457,32 @@ function renderDetail(container, series) {
   playerMeta.innerHTML = `
     <p class="player-meta-title">${escapeHtml(series.name)}</p>
     <p class="player-meta-time-row">
-      <span>首次入库：${escapeHtml(fmt(selected.firstIngestedAt))}</span>
-      <span>最近更新：${escapeHtml(fmt(selected.updatedAt))}</span>
+      <span>首次入库：${escapeHtml(formatDateTime(selected.firstIngestedAt))}</span>
+      <span>最近更新：${escapeHtml(formatDateTime(selected.updatedAt))}</span>
     </p>
     <p class="player-meta-url">${escapeHtml(selected.videoUrl)}</p>
   `;
 }
 
 function renderAdminPanel(container) {
-  if (state.activeAdminTab === 'tag') {
-    const tags = getAllTags();
+  if (appState.activeAdminTab === 'tag') {
+    const tags = getAllTags(appState.allSeries, appState.allTags);
     container.innerHTML = `
       <section class="admin-panel">
         <div class="action-tabs">
-          <button type="button" class="action-tab-btn ${state.activeTagAction === 'create' ? 'active' : ''}" data-tag-action="create">新增标签</button>
-          <button type="button" class="action-tab-btn ${state.activeTagAction === 'rename' ? 'active' : ''}" data-tag-action="rename">修改标签</button>
-          <button type="button" class="action-tab-btn ${state.activeTagAction === 'delete' ? 'active' : ''}" data-tag-action="delete">删除标签</button>
+          <button type="button" class="action-tab-btn ${appState.activeTagAction === 'create' ? 'active' : ''}" data-tag-action="create">新增标签</button>
+          <button type="button" class="action-tab-btn ${appState.activeTagAction === 'rename' ? 'active' : ''}" data-tag-action="rename">修改标签</button>
+          <button type="button" class="action-tab-btn ${appState.activeTagAction === 'delete' ? 'active' : ''}" data-tag-action="delete">删除标签</button>
         </div>
 
-        <section class="action-panel ${state.activeTagAction === 'create' ? '' : 'hidden'}">
+        <section class="action-panel ${appState.activeTagAction === 'create' ? '' : 'hidden'}">
           <form id="tag-create-form" class="inline-form">
             <input name="tagName" required placeholder="标签名" />
             <button type="submit">新增</button>
           </form>
         </section>
 
-        <section class="action-panel ${state.activeTagAction === 'rename' ? '' : 'hidden'}">
+        <section class="action-panel ${appState.activeTagAction === 'rename' ? '' : 'hidden'}">
           <form id="tag-rename-form" class="inline-form">
             <select name="tagName" required>
               <option value="">选择标签</option>
@@ -640,7 +493,7 @@ function renderAdminPanel(container) {
           </form>
         </section>
 
-        <section class="action-panel ${state.activeTagAction === 'delete' ? '' : 'hidden'}">
+        <section class="action-panel ${appState.activeTagAction === 'delete' ? '' : 'hidden'}">
           <form id="tag-delete-form" class="inline-form">
             <select name="tagName" required>
               <option value="">选择标签</option>
@@ -654,7 +507,7 @@ function renderAdminPanel(container) {
 
     document.querySelectorAll('[data-tag-action]').forEach((btn) => {
       btn.onclick = () => {
-        state.activeTagAction = btn.dataset.tagAction;
+        appState.activeTagAction = btn.dataset.tagAction;
         render();
       };
     });
@@ -695,7 +548,7 @@ function renderAdminPanel(container) {
         try {
           await apiFetch(`/api/tags/${encodeURIComponent(tag)}`, { method: 'PATCH', body: JSON.stringify({ newTagName }) });
           setFlashMessage('标签改名成功');
-          if (state.selectedTag === tag) state.selectedTag = newTagName;
+          if (appState.selectedTag === tag) appState.selectedTag = newTagName;
           await loadSeries();
         } catch (error) {
           setFlashMessage(error.message);
@@ -716,7 +569,7 @@ function renderAdminPanel(container) {
         try {
           await apiFetch(`/api/tags/${encodeURIComponent(tag)}`, { method: 'DELETE' });
           setFlashMessage('标签删除成功');
-          if (state.selectedTag === tag) state.selectedTag = null;
+          if (appState.selectedTag === tag) appState.selectedTag = null;
           await loadSeries();
         } catch (error) {
           setFlashMessage(error.message);
@@ -727,17 +580,17 @@ function renderAdminPanel(container) {
     return;
   }
 
-  if (state.activeAdminTab === 'title') {
-    const tags = getAllTags();
+  if (appState.activeAdminTab === 'title') {
+    const tags = getAllTags(appState.allSeries, appState.allTags);
     container.innerHTML = `
       <section class="admin-panel">
         <div class="action-tabs">
-          <button type="button" class="action-tab-btn ${state.activeTitleAction === 'create' ? 'active' : ''}" data-title-action="create">新增漫剧</button>
-          <button type="button" class="action-tab-btn ${state.activeTitleAction === 'rename' ? 'active' : ''}" data-title-action="rename">修改漫剧</button>
-          <button type="button" class="action-tab-btn ${state.activeTitleAction === 'delete' ? 'active' : ''}" data-title-action="delete">删除漫剧</button>
+          <button type="button" class="action-tab-btn ${appState.activeTitleAction === 'create' ? 'active' : ''}" data-title-action="create">新增漫剧</button>
+          <button type="button" class="action-tab-btn ${appState.activeTitleAction === 'rename' ? 'active' : ''}" data-title-action="rename">修改漫剧</button>
+          <button type="button" class="action-tab-btn ${appState.activeTitleAction === 'delete' ? 'active' : ''}" data-title-action="delete">删除漫剧</button>
         </div>
 
-        <section class="action-panel ${state.activeTitleAction === 'create' ? '' : 'hidden'}">
+        <section class="action-panel ${appState.activeTitleAction === 'create' ? '' : 'hidden'}">
           <form id="title-create-form" class="stack-form">
             <input name="name" required placeholder="漫剧名" />
             <input name="poster" required placeholder="海报URL" />
@@ -747,11 +600,11 @@ function renderAdminPanel(container) {
           </form>
         </section>
 
-        <section class="action-panel ${state.activeTitleAction === 'rename' ? '' : 'hidden'}">
+        <section class="action-panel ${appState.activeTitleAction === 'rename' ? '' : 'hidden'}">
           <form id="title-rename-form" class="stack-form">
             <select name="name" required>
               <option value="">选择漫剧</option>
-              ${state.allSeries.map((series) => `<option value="${series.name}">${series.name}</option>`).join('')}
+              ${appState.allSeries.map((series) => `<option value="${series.name}">${series.name}</option>`).join('')}
             </select>
             <input name="newName" required placeholder="漫剧名" />
             <input name="newPoster" required placeholder="海报URL" />
@@ -760,11 +613,11 @@ function renderAdminPanel(container) {
           </form>
         </section>
 
-        <section class="action-panel ${state.activeTitleAction === 'delete' ? '' : 'hidden'}">
+        <section class="action-panel ${appState.activeTitleAction === 'delete' ? '' : 'hidden'}">
           <form id="title-delete-form" class="inline-form">
             <select name="name" required>
               <option value="">选择漫剧</option>
-              ${state.allSeries.map((series) => `<option value="${series.name}">${series.name}</option>`).join('')}
+              ${appState.allSeries.map((series) => `<option value="${series.name}">${series.name}</option>`).join('')}
             </select>
             <button type="submit">删除</button>
           </form>
@@ -774,7 +627,7 @@ function renderAdminPanel(container) {
 
     document.querySelectorAll('[data-title-action]').forEach((btn) => {
       btn.onclick = () => {
-        state.activeTitleAction = btn.dataset.titleAction;
+        appState.activeTitleAction = btn.dataset.titleAction;
         render();
       };
     });
@@ -820,7 +673,7 @@ function renderAdminPanel(container) {
       const newPosterInput = titleRenameForm.elements.namedItem('newPoster');
 
       const fillTitleEditFields = (titleName) => {
-        const targetSeries = state.allSeries.find((series) => series.name === titleName);
+        const targetSeries = appState.allSeries.find((series) => series.name === titleName);
         if (!targetSeries) return;
         newNameInput.value = targetSeries.name;
         newPosterInput.value = targetSeries.poster;
@@ -886,17 +739,17 @@ function renderAdminPanel(container) {
   container.innerHTML = `
     <section class="admin-panel">
       <div class="action-tabs episode-action-tabs">
-        <button type="button" class="action-tab-btn ${state.activeEpisodeAction === 'create' ? 'active' : ''}" data-episode-action="create">新增剧集</button>
-        <button type="button" class="action-tab-btn ${state.activeEpisodeAction === 'batch' ? 'active' : ''}" data-episode-action="batch">批量导入</button>
-        <button type="button" class="action-tab-btn ${state.activeEpisodeAction === 'rename' ? 'active' : ''}" data-episode-action="rename">修改剧集</button>
-        <button type="button" class="action-tab-btn ${state.activeEpisodeAction === 'delete' ? 'active' : ''}" data-episode-action="delete">删除剧集</button>
+        <button type="button" class="action-tab-btn ${appState.activeEpisodeAction === 'create' ? 'active' : ''}" data-episode-action="create">新增剧集</button>
+        <button type="button" class="action-tab-btn ${appState.activeEpisodeAction === 'batch' ? 'active' : ''}" data-episode-action="batch">批量导入</button>
+        <button type="button" class="action-tab-btn ${appState.activeEpisodeAction === 'rename' ? 'active' : ''}" data-episode-action="rename">修改剧集</button>
+        <button type="button" class="action-tab-btn ${appState.activeEpisodeAction === 'delete' ? 'active' : ''}" data-episode-action="delete">删除剧集</button>
       </div>
 
-      <section class="action-panel ${state.activeEpisodeAction === 'create' ? '' : 'hidden'}">
+      <section class="action-panel ${appState.activeEpisodeAction === 'create' ? '' : 'hidden'}">
         <form id="episode-create-form" class="stack-form">
           <select name="titleName" required>
             <option value="">选择漫剧</option>
-            ${state.allSeries.map((series) => `<option value="${series.name}">${series.name}</option>`).join('')}
+            ${appState.allSeries.map((series) => `<option value="${series.name}">${series.name}</option>`).join('')}
           </select>
           <input type="number" min="1" name="episodeNo" required placeholder="集号" />
           <input name="videoUrl" required placeholder="播放URL" />
@@ -904,23 +757,23 @@ function renderAdminPanel(container) {
         </form>
       </section>
 
-      <section class="action-panel ${state.activeEpisodeAction === 'batch' ? '' : 'hidden'}">
+      <section class="action-panel ${appState.activeEpisodeAction === 'batch' ? '' : 'hidden'}">
         <form id="episode-batch-form" class="stack-form">
           <input name="name" required placeholder="漫剧名" />
           <input name="poster" required placeholder="海报URL" />
           <input name="directoryUrl" required placeholder="视频目录URL，例如 http://localhost:7777/某个目录/" />
-          ${getTagMultiSelectHtml('batchTags', getAllTags())}
+          ${getTagMultiSelectHtml('batchTags', getAllTags(appState.allSeries, appState.allTags))}
           <p id="episode-batch-tags-error" class="field-error hidden" role="alert" aria-live="polite"></p>
           <p class="hint">会自动解析目录下视频链接并按文件名中的“第1集/第一集/EP01”等集号排序导入。</p>
           <button type="submit">批量导入</button>
         </form>
       </section>
 
-      <section class="action-panel ${state.activeEpisodeAction === 'rename' ? '' : 'hidden'}">
+      <section class="action-panel ${appState.activeEpisodeAction === 'rename' ? '' : 'hidden'}">
         <form id="episode-update-form" class="stack-form">
           <select name="titleName" required>
             <option value="">选择漫剧</option>
-            ${state.allSeries.map((series) => `<option value="${series.name}">${series.name}</option>`).join('')}
+            ${appState.allSeries.map((series) => `<option value="${series.name}">${series.name}</option>`).join('')}
           </select>
           <select name="episodeNo" required>
             <option value="">选择集号</option>
@@ -931,11 +784,11 @@ function renderAdminPanel(container) {
         </form>
       </section>
 
-      <section class="action-panel ${state.activeEpisodeAction === 'delete' ? '' : 'hidden'}">
+      <section class="action-panel ${appState.activeEpisodeAction === 'delete' ? '' : 'hidden'}">
         <form id="episode-delete-form" class="inline-form">
           <select name="titleName" required>
             <option value="">选择漫剧</option>
-            ${state.allSeries.map((series) => `<option value="${series.name}">${series.name}</option>`).join('')}
+            ${appState.allSeries.map((series) => `<option value="${series.name}">${series.name}</option>`).join('')}
           </select>
           <select name="episodeNo" required>
             <option value="">选择集号</option>
@@ -948,7 +801,7 @@ function renderAdminPanel(container) {
 
   document.querySelectorAll('[data-episode-action]').forEach((btn) => {
     btn.onclick = () => {
-      state.activeEpisodeAction = btn.dataset.episodeAction;
+      appState.activeEpisodeAction = btn.dataset.episodeAction;
       render();
     };
   });
@@ -969,7 +822,7 @@ function renderAdminPanel(container) {
       try {
         await apiFetch('/api/episodes', { method: 'POST', body: JSON.stringify(payload) });
         if (currentPathName() === payload.titleName) {
-          state.selectedEpisode = payload.episodeNo;
+          appState.selectedEpisode = payload.episodeNo;
         }
         setFlashMessage('剧集新增成功');
         await loadSeries();
@@ -1009,7 +862,7 @@ function renderAdminPanel(container) {
         const updated = result.data?.updated ?? 0;
         setFlashMessage(`批量导入成功：共 ${total} 集，新增 ${inserted} 集，更新 ${updated} 集`);
         if (currentPathName() === payload.name) {
-          state.selectedEpisode = 1;
+          appState.selectedEpisode = 1;
         }
         await loadSeries();
       } catch (error) {
@@ -1027,7 +880,7 @@ function renderAdminPanel(container) {
     const videoUrlInput = episodeUpdateForm.elements.namedItem('videoUrl');
 
     const syncEpisodeEditFields = () => {
-      const episodes = getEpisodeOptionsByTitle(titleSelect.value);
+      const episodes = getEpisodeOptionsByTitle(appState.allSeries, titleSelect.value);
       const selectedEpisodeNo = Number(episodeSelect.value);
       const targetEpisode = episodes.find((episode) => episode.episode === selectedEpisodeNo);
 
@@ -1042,7 +895,7 @@ function renderAdminPanel(container) {
     };
 
     const syncEpisodeOptions = () => {
-      fillEpisodeSelectByTitle(titleSelect, episodeSelect, '选择集号');
+      fillEpisodeSelectByTitle(appState.allSeries, titleSelect, episodeSelect, '选择集号');
       syncEpisodeEditFields();
     };
 
@@ -1078,7 +931,7 @@ function renderAdminPanel(container) {
     const episodeSelect = episodeDeleteForm.elements.namedItem('episodeNo');
 
     const syncEpisodeOptions = () => {
-      fillEpisodeSelectByTitle(titleSelect, episodeSelect, '选择集号');
+      fillEpisodeSelectByTitle(appState.allSeries, titleSelect, episodeSelect, '选择集号');
     };
 
     titleSelect.onchange = syncEpisodeOptions;
