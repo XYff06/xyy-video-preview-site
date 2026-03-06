@@ -2,7 +2,7 @@
 
 一个前后端分离职责更清晰的轻量视频预览站点：
 
-- 前端：`index.html + app.js + styles.css`，只负责 UI 展示与交互。
+- 前端：`index.html + app.ts + styles.css`，只负责 UI 展示与交互；`app.js` 由 TypeScript 构建产物生成。
 - 后端：Flask API 服务，负责查询、管理、批量导入等业务逻辑。
 - 数据层：PostgreSQL 持久化存储。
 
@@ -113,7 +113,8 @@ curl http://localhost:4173/api/health
 ```text
 .
 ├─ app.py                # Flask API + 静态资源入口
-├─ app.js                # 前端交互逻辑（UI）
+├─ app.ts                # 前端交互逻辑（TypeScript 源码）
+├─ app.js                # TypeScript 构建输出（浏览器实际加载）
 ├─ styles.css            # 前端样式
 ├─ index.html            # 页面模板
 ├─ requirements.txt      # Python 依赖
