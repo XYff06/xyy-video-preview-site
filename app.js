@@ -19,8 +19,6 @@ const state = {
   tagExpanded: false,
   loading: true,
   error: null,
-  activeAdminTab: 'tag',
-  adminModalOpen: false,
   flashMessage: '',
   flashAutoCloseTimeout: null,
   flashVersion: 0,
@@ -284,17 +282,9 @@ function render() {
         ${getFlashHtml()}
         <section id="page-content"></section>
       </section>
-      <aside class="side-rail right-rail">
-        <button id="open-admin" class="primary-btn manage-btn" type="button">管理</button>
-      </aside>
+      <aside class="side-rail right-rail"></aside>
     </section>
-    ${getAdminModalHtml()}
   `;
-
-  document.getElementById('open-admin').onclick = () => {
-    state.adminModalOpen = true;
-    render();
-  };
 
   const flashCloseBtn = document.getElementById('flash-close-btn');
   if (state.flashMessage && state.flashVersionRendered !== state.flashVersion) {
@@ -312,28 +302,6 @@ function render() {
       clearFlashMessage();
       render();
     };
-  }
-
-  if (state.adminModalOpen) {
-    document.getElementById('close-admin').onclick = () => {
-      state.adminModalOpen = false;
-      render();
-    };
-
-    document.getElementById('admin-modal-mask').onclick = (event) => {
-      if (event.target.id !== 'admin-modal-mask') return;
-      state.adminModalOpen = false;
-      render();
-    };
-
-    document.querySelectorAll('[data-admin-tab]').forEach((btn) => {
-      btn.onclick = () => {
-        state.activeAdminTab = btn.dataset.adminTab;
-        render();
-      };
-    });
-
-    renderAdminPanel(document.getElementById('admin-content'));
   }
 
   const pageContent = document.getElementById('page-content');

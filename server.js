@@ -1,11 +1,14 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { spawn } = require('child_process');
 const { Pool } = require('pg');
 
 const HOST = '0.0.0.0';
 const PORT = Number(process.env.PORT) || 4173;
 const ROOT_DIR = __dirname;
+const DATA_DIR = path.join(ROOT_DIR, 'data');
+const ADMIN_CONFIG_PATH = path.join(DATA_DIR, 'admin-config.json');
 
 function optionalEnv(name) {
   const value = process.env[name];
@@ -105,7 +108,127 @@ function getAllowedMethods(pathname) {
   if (pathname.startsWith('/api/titles/')) return ['PATCH', 'DELETE'];
   if (pathname === '/api/episodes') return ['POST', 'PATCH', 'DELETE'];
   if (pathname === '/api/episodes/batch-directory') return ['POST'];
+  if (pathname === '/api/admin/oss-config') return ['GET', 'PUT'];
+  if (pathname === '/api/admin/oss/upload') return ['POST'];
   return null;
+}
+
+function getDefaultAdminConfig() {
+  return {
+    oss: {
+      accessKey: '',
+      secretKey: '',
+      endpoint: '',
+      region: '',
+      bucketName: '',
+      uploadPrefix: 'py-upload'
+    }
+  };
+}
+
+function readAdminConfig() {
+  try {
+    const raw = fs.readFileSync(ADMIN_CONFIG_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+    return {
+      ...getDefaultAdminConfig(),
+      ...parsed,
+      oss: {
+        ...getDefaultAdminConfig().oss,
+        ...(parsed.oss || {})
+      }
+    };
+  } catch {
+    return getDefaultAdminConfig();
+  }
+}
+
+function writeAdminConfig(nextConfig) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(ADMIN_CONFIG_PATH, `${JSON.stringify(nextConfig, null, 2)}\n`, 'utf-8');
+}
+
+function toMaskedOssConfig(oss) {
+  const mask = (v) => {
+    const text = String(v || '');
+    if (!text) return '';
+    if (text.length <= 6) return `${text.slice(0, 2)}***`;
+    return `${text.slice(0, 3)}***${text.slice(-3)}`;
+  };
+
+  return {
+    endpoint: oss.endpoint,
+    region: oss.region,
+    bucketName: oss.bucketName,
+    uploadPrefix: oss.uploadPrefix,
+    accessKeyMasked: mask(oss.accessKey),
+    secretKeyMasked: mask(oss.secretKey),
+    configured: Boolean(oss.accessKey && oss.secretKey && oss.endpoint && oss.region && oss.bucketName)
+  };
+}
+
+function runOssUploadWithPython({ oss, filePaths }) {
+  return new Promise((resolve, reject) => {
+    const script = String.raw`
+import json
+import os
+import sys
+import tos
+
+payload = json.loads(sys.stdin.read() or '{}')
+oss = payload.get('oss') or {}
+file_paths = payload.get('filePaths') or []
+
+client = tos.TosClientV2(oss.get('accessKey', ''), oss.get('secretKey', ''), oss.get('endpoint', ''), oss.get('region', ''))
+bucket_name = oss.get('bucketName', '')
+prefix = (oss.get('uploadPrefix') or 'py-upload').strip('/')
+
+url_list = []
+key_list = []
+
+for item in file_paths:
+    abs_path = os.path.abspath(str(item))
+    if not os.path.isfile(abs_path):
+        continue
+
+    filename = os.path.basename(abs_path)
+    key = f"{prefix}/{filename}" if prefix else filename
+    resp = client.put_object_from_file(bucket_name, key, abs_path)
+    if getattr(resp, 'status_code', None) == 200:
+        url = f"https://{bucket_name}.{oss.get('endpoint', '')}/{key}"
+        url_list.append(url)
+        key_list.append(key)
+
+print(json.dumps({'urls': url_list, 'keys': key_list}, ensure_ascii=False))
+`;
+
+    const child = spawn('python3', ['-c', script], { stdio: ['pipe', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(stderr.trim() || `OSS 上传失败，退出码: ${code}`));
+        return;
+      }
+
+      try {
+        resolve(JSON.parse(stdout.trim() || '{}'));
+      } catch {
+        reject(new Error('OSS 上传返回结果解析失败'));
+      }
+    });
+
+    child.stdin.write(JSON.stringify({ oss, filePaths }));
+    child.stdin.end();
+  });
 }
 
 function sendMethodNotAllowed(res, allowedMethods) {
@@ -425,6 +548,71 @@ const server = http.createServer(async (req, res) => {
         pageSize: parsePositiveInt(url.searchParams.get('pageSize'), 25, 100)
       });
       sendJson(res, 200, payload);
+      return;
+    }
+
+    if (pathname === '/api/admin/oss-config' && req.method === 'GET') {
+      const config = readAdminConfig();
+      sendJson(res, 200, { data: toMaskedOssConfig(config.oss) });
+      return;
+    }
+
+    if (pathname === '/api/admin/oss-config' && req.method === 'PUT') {
+      const body = await readBody(req);
+      const oss = {
+        accessKey: String(body.accessKey || '').trim(),
+        secretKey: String(body.secretKey || '').trim(),
+        endpoint: String(body.endpoint || '').trim(),
+        region: String(body.region || '').trim(),
+        bucketName: String(body.bucketName || '').trim(),
+        uploadPrefix: String(body.uploadPrefix || 'py-upload').trim()
+      };
+
+      if (!oss.accessKey) return sendJson(res, 400, { message: 'accessKey 不能为空' });
+      if (!oss.secretKey) return sendJson(res, 400, { message: 'secretKey 不能为空' });
+      if (!oss.endpoint) return sendJson(res, 400, { message: 'endpoint 不能为空' });
+      if (!oss.region) return sendJson(res, 400, { message: 'region 不能为空' });
+      if (!oss.bucketName) return sendJson(res, 400, { message: 'bucketName 不能为空' });
+
+      const config = readAdminConfig();
+      config.oss = {
+        ...config.oss,
+        ...oss,
+        uploadPrefix: oss.uploadPrefix || 'py-upload'
+      };
+      writeAdminConfig(config);
+      sendJson(res, 200, { message: 'OSS 配置保存成功', data: toMaskedOssConfig(config.oss) });
+      return;
+    }
+
+    if (pathname === '/api/admin/oss/upload' && req.method === 'POST') {
+      const body = await readBody(req);
+      const filePaths = Array.isArray(body.filePaths)
+        ? body.filePaths.map((item) => String(item || '').trim()).filter(Boolean)
+        : [];
+      if (!filePaths.length) return sendJson(res, 400, { message: 'filePaths 不能为空（请传入绝对路径数组）' });
+
+      const config = readAdminConfig();
+      const oss = config.oss || {};
+      if (!oss.accessKey || !oss.secretKey || !oss.endpoint || !oss.region || !oss.bucketName) {
+        return sendJson(res, 400, { message: 'OSS 配置不完整，请先调用 /api/admin/oss-config 保存配置' });
+      }
+
+      const missingPaths = filePaths.filter((p) => !fs.existsSync(path.resolve(p)) || !fs.statSync(path.resolve(p)).isFile());
+      if (missingPaths.length) {
+        return sendJson(res, 400, { message: `以下路径不是有效文件: ${missingPaths.join(', ')}` });
+      }
+
+      const result = await runOssUploadWithPython({ oss, filePaths });
+      sendJson(res, 200, {
+        message: `上传完成，共 ${result.urls?.length || 0} 个文件`,
+        data: {
+          filesUrl: (result.urls || []).join('\n'),
+          keys: (result.keys || []).join('\n'),
+          urls: result.urls || [],
+          keysList: result.keys || []
+        }
+      });
       return;
     }
 

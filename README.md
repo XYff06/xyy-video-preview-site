@@ -22,10 +22,11 @@
 - 选集区：**单行 10 个**，左右三角按钮切换上一页/下一页
 - 展示剧集元信息：`firstIngestedAt` / `updatedAt` / `videoUrl`
 
-### 管理功能（右侧“管理”按钮）
-- 标签管理：新增 / 修改 / 删除
-- 漫剧管理：新增 / 修改 / 删除
-- 内容管理：新增单集、批量导入、修改、删除
+### 管理功能（后端统一管理）
+- 标签管理：新增 / 修改 / 删除（API）
+- 漫剧管理：新增 / 修改 / 删除（API）
+- 内容管理：新增单集、批量导入、修改、删除（API）
+- OSS 管理：后端保存 OSS 配置，并支持按绝对路径批量上传（API）
 
 ---
 
@@ -185,6 +186,9 @@ npm start
 - `DELETE /api/episodes`
 - `POST /api/episodes/batch-directory`
 - `GET /api/ingest-records`
+- `GET /api/admin/oss-config`
+- `PUT /api/admin/oss-config`
+- `POST /api/admin/oss/upload`
 
 可通过 `curl` 自检：
 
