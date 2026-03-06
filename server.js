@@ -54,10 +54,10 @@ function sendJson(res, statusCode, data) {
   res.end(JSON.stringify(data));
 }
 
-function parsePositiveInt(value, defaultValue) {
+function parsePositiveInt(value, defaultValue, maxValue = Number.POSITIVE_INFINITY) {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed) || parsed <= 0) return defaultValue;
-  return parsed;
+  return Math.min(parsed, maxValue);
 }
 
 function validateNonEmptyString(v) {
@@ -314,15 +314,23 @@ async function querySeries({ tag, name, search, sort, page, pageSize }) {
   const offsetIndex = listValues.length;
 
   const orderByClause = resolveSort(sort);
+  const orderBySelectedTitles = orderByClause.split('t.').join('st.');
 
   const listSql = `
+    WITH selected_titles AS (
+      SELECT t.id, t.name, t.cover_url, t.first_ingested_at, t.updated_at
+      FROM title t
+      ${whereClause}
+      ORDER BY ${orderByClause}
+      LIMIT $${limitIndex} OFFSET $${offsetIndex}
+    )
     SELECT
-      t.id,
-      t.name,
-      t.cover_url AS poster,
-      t.first_ingested_at AS "firstIngestedAt",
-      t.updated_at AS "updatedAt",
-      COALESCE(MAX(e.first_ingested_at), t.first_ingested_at) AS "lastNewEpisodeAt",
+      st.id,
+      st.name,
+      st.cover_url AS poster,
+      st.first_ingested_at AS "firstIngestedAt",
+      st.updated_at AS "updatedAt",
+      COALESCE(MAX(e.first_ingested_at), st.first_ingested_at) AS "lastNewEpisodeAt",
       COALESCE(
         ARRAY_AGG(DISTINCT g.tag_name) FILTER (WHERE g.tag_name IS NOT NULL),
         ARRAY[]::text[]
@@ -338,14 +346,12 @@ async function querySeries({ tag, name, search, sort, page, pageSize }) {
         ) FILTER (WHERE e.id IS NOT NULL),
         '[]'::json
       ) AS episodes
-    FROM title t
-    LEFT JOIN episode e ON e.title_id = t.id
-    LEFT JOIN title_tag tt ON tt.title_id = t.id
+    FROM selected_titles st
+    LEFT JOIN episode e ON e.title_id = st.id
+    LEFT JOIN title_tag tt ON tt.title_id = st.id
     LEFT JOIN tag g ON g.id = tt.tag_id
-    ${whereClause}
-    GROUP BY t.id
-    ORDER BY ${orderByClause}
-    LIMIT $${limitIndex} OFFSET $${offsetIndex}
+    GROUP BY st.id, st.name, st.cover_url, st.first_ingested_at, st.updated_at
+    ORDER BY ${orderBySelectedTitles}
   `;
 
   const listRes = await pool.query(listSql, listValues);
@@ -416,7 +422,7 @@ const server = http.createServer(async (req, res) => {
         search: url.searchParams.get('search'),
         sort: url.searchParams.get('sort'),
         page: parsePositiveInt(url.searchParams.get('page'), 1),
-        pageSize: parsePositiveInt(url.searchParams.get('pageSize'), 25)
+        pageSize: parsePositiveInt(url.searchParams.get('pageSize'), 25, 100)
       });
       sendJson(res, 200, payload);
       return;

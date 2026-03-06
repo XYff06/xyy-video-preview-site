@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS title_tag (
 );
 
 CREATE INDEX IF NOT EXISTS index_title_tag_tag_id_title_id ON title_tag (tag_id, title_id);
+CREATE INDEX IF NOT EXISTS index_title_tag_title_id ON title_tag (title_id);
 
 CREATE OR REPLACE FUNCTION function_set_updated_at_to_current_timestamp()
 RETURNS TRIGGER AS $$
