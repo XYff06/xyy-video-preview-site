@@ -171,6 +171,17 @@ function fillEpisodeSelectByTitle(titleSelect, episodeSelect, placeholderText) {
     .join('')}`;
 }
 
+function validateTagSelection(form, fieldName, message) {
+  const checkboxes = [...form.querySelectorAll(`input[name="${fieldName}"]`)];
+  if (checkboxes.length === 0) return false;
+
+  const hasSelection = checkboxes.some((checkbox) => checkbox.checked);
+  const firstCheckbox = checkboxes[0];
+  firstCheckbox.setCustomValidity(hasSelection ? '' : message);
+  firstCheckbox.reportValidity();
+  return hasSelection;
+}
+
 function getFlashHtml() {
   if (!state.flashMessage) return '';
   return `
@@ -599,6 +610,13 @@ function renderAdminPanel(container) {
 
     const renameForm = document.getElementById('tag-rename-form');
     if (renameForm) {
+      const tagSelect = renameForm.elements.namedItem('tagName');
+      const newTagInput = renameForm.elements.namedItem('newTagName');
+
+      tagSelect.onchange = () => {
+        newTagInput.value = tagSelect.value;
+      };
+
       renameForm.onsubmit = async (event) => {
         event.preventDefault();
         const formData = new FormData(event.target);
@@ -705,9 +723,7 @@ function renderAdminPanel(container) {
           .getAll('tags')
           .map((tag) => String(tag).trim())
           .filter(Boolean);
-        if (titleTags.length === 0) {
-          setFlashMessage('请至少选择一个标签');
-          render();
+        if (!validateTagSelection(event.target, 'tags', '请至少选择一个标签')) {
           return;
         }
         try {
@@ -877,12 +893,31 @@ function renderAdminPanel(container) {
   if (episodeUpdateForm) {
     const titleSelect = episodeUpdateForm.elements.namedItem('titleName');
     const episodeSelect = episodeUpdateForm.elements.namedItem('episodeNo');
+    const newEpisodeInput = episodeUpdateForm.elements.namedItem('newEpisodeNo');
+    const videoUrlInput = episodeUpdateForm.elements.namedItem('videoUrl');
+
+    const syncEpisodeEditFields = () => {
+      const episodes = getEpisodeOptionsByTitle(titleSelect.value);
+      const selectedEpisodeNo = Number(episodeSelect.value);
+      const targetEpisode = episodes.find((episode) => episode.episode === selectedEpisodeNo);
+
+      if (!targetEpisode) {
+        newEpisodeInput.value = '';
+        videoUrlInput.value = '';
+        return;
+      }
+
+      newEpisodeInput.value = String(targetEpisode.episode);
+      videoUrlInput.value = targetEpisode.videoUrl;
+    };
 
     const syncEpisodeOptions = () => {
       fillEpisodeSelectByTitle(titleSelect, episodeSelect, '选择集号');
+      syncEpisodeEditFields();
     };
 
     titleSelect.onchange = syncEpisodeOptions;
+    episodeSelect.onchange = syncEpisodeEditFields;
     syncEpisodeOptions();
 
     episodeUpdateForm.onsubmit = async (event) => {
