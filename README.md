@@ -2,7 +2,7 @@
 
 一个前后端分离职责更清晰的轻量视频预览站点：
 
-- 前端：`index.html + app.ts + styles.css`，只负责 UI 展示与交互；构建产物输出到 `dist/app.js`（不再维护根目录 `app.js`）。
+- 前端：`index.html + app.ts + styles.css`，只负责 UI 展示与交互；直接加载根目录 `app.ts`（文件后缀为 `.ts`，内容为可直接在浏览器执行的 ES Module）。
 - 后端：Flask API 服务，负责查询、管理、批量导入等业务逻辑。
 - 数据层：PostgreSQL 持久化存储。
 
@@ -122,7 +122,6 @@ curl -I "你的 directoryUrl"
 .
 ├─ app.py                # Flask API + 静态资源入口
 ├─ app.ts                # 前端交互逻辑（TypeScript 源码）
-├─ dist/app.js           # TypeScript 构建输出（浏览器加载）
 ├─ styles.css            # 前端样式
 ├─ index.html            # 页面模板
 ├─ requirements.txt      # Python 依赖
