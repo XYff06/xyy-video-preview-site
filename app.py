@@ -428,7 +428,10 @@ def episodes_batch_directory():
     if parsed.scheme not in ('http', 'https'):
         return jsonify({'message': 'directoryUrl 只支持 http/https'}), 400
 
-    resp = requests.get(directory_url, timeout=10)
+    try:
+        resp = requests.get(directory_url, timeout=10)
+    except requests.RequestException as e:
+        return jsonify({'message': f'读取目录失败：{e.__class__.__name__}'}), 400
     if resp.status_code >= 400:
         return jsonify({'message': f'读取目录失败：HTTP {resp.status_code}'}), 400
     if 'html' not in (resp.headers.get('content-type') or '').lower():

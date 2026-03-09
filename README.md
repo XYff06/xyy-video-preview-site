@@ -100,10 +100,18 @@ python app.py
 - `POST /api/episodes/batch-directory`
 - `GET /api/ingest-records`
 
+> 说明：`POST /api/episodes/batch-directory` 在访问目录 URL 失败（如超时、DNS 失败、连接拒绝）时，会返回 `400` 和明确错误类型，避免直接抛出 `500`。
+
 快速自检：
 
 ```bash
 curl http://localhost:4173/api/health
+```
+
+如果批量导入目录失败，可先自检目录地址：
+
+```bash
+curl -I "你的 directoryUrl"
 ```
 
 ---
