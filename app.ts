@@ -350,12 +350,13 @@ function render() {
             render();
         };
         document.getElementById('admin-modal-mask').onclick = (event) => {
-            if (event.target.id !== 'admin-modal-mask')
+            const target = event.target;
+            if (!(target instanceof HTMLElement) || target.id !== 'admin-modal-mask')
                 return;
             appState.adminModalOpen = false;
             render();
         };
-        document.querySelectorAll('[data-admin-tab]').forEach((btn) => {
+        document.querySelectorAll<HTMLElement>('[data-admin-tab]').forEach((btn) => {
             btn.onclick = () => {
                 appState.activeAdminTab = btn.dataset.adminTab;
                 render();
@@ -435,9 +436,9 @@ function renderHome(container) {
         };
         categoryList.appendChild(btn);
     });
-    const searchForm = document.getElementById('global-search-form');
-    const searchInput = document.getElementById('global-search');
-    const sortSelect = document.getElementById('global-sort');
+    const searchForm = document.getElementById('global-search-form') as HTMLFormElement;
+    const searchInput = document.getElementById('global-search') as HTMLInputElement;
+    const sortSelect = document.getElementById('global-sort') as HTMLSelectElement;
     searchForm.onsubmit = (event) => {
         event.preventDefault();
         appState.searchQuery = searchInput.value;
@@ -506,8 +507,8 @@ function renderHome(container) {
       <button type="submit" class="page-jump-btn">确定</button>
     </form>
   `;
-    const prevBtn = pagination.querySelector('[data-page="prev"]');
-    const nextBtn = pagination.querySelector('[data-page="next"]');
+    const prevBtn = pagination.querySelector('[data-page="prev"]') as HTMLButtonElement;
+    const nextBtn = pagination.querySelector('[data-page="next"]') as HTMLButtonElement;
     prevBtn.onclick = () => {
         if (appState.currentPage <= 1)
             return;
@@ -520,7 +521,7 @@ function renderHome(container) {
         appState.currentPage += 1;
         loadHomeSeriesPage();
     };
-    pagination.querySelectorAll('[data-page-no]').forEach((btn) => {
+    pagination.querySelectorAll<HTMLElement>('[data-page-no]').forEach((btn) => {
         btn.onclick = () => {
             const pageNo = Number(btn.dataset.pageNo);
             if (!Number.isFinite(pageNo) || pageNo === appState.currentPage)
@@ -529,10 +530,10 @@ function renderHome(container) {
             loadHomeSeriesPage();
         };
     });
-    const jumpForm = pagination.querySelector('#page-jump-form');
+    const jumpForm = pagination.querySelector('#page-jump-form') as HTMLFormElement;
     jumpForm.onsubmit = (event) => {
         event.preventDefault();
-        const input = jumpForm.querySelector('#page-jump-input');
+        const input = jumpForm.querySelector('#page-jump-input') as HTMLInputElement;
         const nextPage = Number(input.value);
         if (!Number.isFinite(nextPage))
             return;
@@ -577,8 +578,8 @@ function renderDetail(container, series) {
         };
         episodeRow.appendChild(tab);
     });
-    const prevEpisodePageBtn = document.getElementById('episode-prev');
-    const nextEpisodePageBtn = document.getElementById('episode-next');
+    const prevEpisodePageBtn = document.getElementById('episode-prev') as HTMLButtonElement;
+    const nextEpisodePageBtn = document.getElementById('episode-next') as HTMLButtonElement;
     prevEpisodePageBtn.disabled = appState.episodePage <= 1;
     nextEpisodePageBtn.disabled = appState.episodePage >= totalEpisodePages;
     prevEpisodePageBtn.onclick = () => {
@@ -596,7 +597,7 @@ function renderDetail(container, series) {
     const selected = series.episodes.find((e) => e.episode === appState.selectedEpisode) || series.episodes[0];
     const maxEpisode = series.episodes.reduce((max, ep) => Math.max(max, Number(ep.episode) || 0), 0);
     const totalEpisodes = series.episodes.length;
-    const player = document.getElementById('player');
+    const player = document.getElementById('player') as HTMLIFrameElement;
     const playerMeta = document.getElementById('player-meta');
     if (!selected) {
         player.removeAttribute('src');
@@ -656,17 +657,17 @@ function renderAdminPanel(container) {
         </section>
       </section>
     `;
-        document.querySelectorAll('[data-tag-action]').forEach((btn) => {
+        document.querySelectorAll<HTMLElement>('[data-tag-action]').forEach((btn) => {
             btn.onclick = () => {
                 appState.activeTagAction = btn.dataset.tagAction;
                 render();
             };
         });
-        const createForm = document.getElementById('tag-create-form');
+        const createForm = document.getElementById('tag-create-form') as HTMLFormElement | null;
         if (createForm) {
             createForm.onsubmit = async (event) => {
                 event.preventDefault();
-                const formData = new FormData(event.target);
+                const formData = new FormData(event.currentTarget as HTMLFormElement);
                 const tagName = String(formData.get('tagName') || '').trim();
                 try {
                     await apiFetch('/api/tags', { method: 'POST', body: JSON.stringify({ tagName }) });
@@ -679,16 +680,16 @@ function renderAdminPanel(container) {
                 }
             };
         }
-        const renameForm = document.getElementById('tag-rename-form');
+        const renameForm = document.getElementById('tag-rename-form') as HTMLFormElement | null;
         if (renameForm) {
-            const tagSelect = renameForm.elements.namedItem('tagName');
-            const newTagInput = renameForm.elements.namedItem('newTagName');
+            const tagSelect = renameForm.elements.namedItem('tagName') as HTMLSelectElement;
+            const newTagInput = renameForm.elements.namedItem('newTagName') as HTMLInputElement;
             tagSelect.onchange = () => {
                 newTagInput.value = tagSelect.value;
             };
             renameForm.onsubmit = async (event) => {
                 event.preventDefault();
-                const formData = new FormData(event.target);
+                const formData = new FormData(event.currentTarget as HTMLFormElement);
                 const tag = String(formData.get('tagName') || '').trim();
                 const newTagName = String(formData.get('newTagName') || '').trim();
                 if (!tag || !newTagName || newTagName === tag)
@@ -706,11 +707,11 @@ function renderAdminPanel(container) {
                 }
             };
         }
-        const deleteForm = document.getElementById('tag-delete-form');
+        const deleteForm = document.getElementById('tag-delete-form') as HTMLFormElement | null;
         if (deleteForm) {
             deleteForm.onsubmit = async (event) => {
                 event.preventDefault();
-                const formData = new FormData(event.target);
+                const formData = new FormData(event.currentTarget as HTMLFormElement);
                 const tag = String(formData.get('tagName') || '').trim();
                 if (!tag)
                     return;
@@ -775,31 +776,31 @@ function renderAdminPanel(container) {
         </section>
       </section>
     `;
-        document.querySelectorAll('[data-title-action]').forEach((btn) => {
+        document.querySelectorAll<HTMLElement>('[data-title-action]').forEach((btn) => {
             btn.onclick = () => {
                 appState.activeTitleAction = btn.dataset.titleAction;
                 render();
             };
         });
         bindMultiSelectSummary(container);
-        const titleCreateForm = document.getElementById('title-create-form');
+        const titleCreateForm = document.getElementById('title-create-form') as HTMLFormElement | null;
         if (titleCreateForm) {
-            const tagsErrorNode = titleCreateForm.querySelector('#title-create-tags-error');
-            titleCreateForm.querySelectorAll('input[name="tags"]').forEach((checkbox) => {
+            const tagsErrorNode = titleCreateForm.querySelector('#title-create-tags-error') as HTMLElement | null;
+            titleCreateForm.querySelectorAll<HTMLInputElement>('input[name="tags"]').forEach((checkbox) => {
                 checkbox.onchange = () => {
                     validateTagSelection(titleCreateForm, 'tags', tagsErrorNode, '请至少选择一个标签');
                 };
             });
             titleCreateForm.onsubmit = async (event) => {
                 event.preventDefault();
-                const formData = new FormData(event.target);
+                const formData = new FormData(event.currentTarget as HTMLFormElement);
                 const name = String(formData.get('name') || '').trim();
                 const poster = String(formData.get('poster') || '').trim();
                 const titleTags = formData
                     .getAll('tags')
                     .map((tag) => String(tag).trim())
                     .filter(Boolean);
-                if (!validateTagSelection(event.target, 'tags', tagsErrorNode, '请至少选择一个标签')) {
+                if (!validateTagSelection(event.currentTarget as HTMLFormElement, 'tags', tagsErrorNode, '请至少选择一个标签')) {
                     return;
                 }
                 try {
@@ -813,18 +814,18 @@ function renderAdminPanel(container) {
                 }
             };
         }
-        const titleRenameForm = document.getElementById('title-rename-form');
+        const titleRenameForm = document.getElementById('title-rename-form') as HTMLFormElement | null;
         if (titleRenameForm) {
-            const titleSelect = titleRenameForm.elements.namedItem('name');
-            const newNameInput = titleRenameForm.elements.namedItem('newName');
-            const newPosterInput = titleRenameForm.elements.namedItem('newPoster');
+            const titleSelect = titleRenameForm.elements.namedItem('name') as HTMLSelectElement;
+            const newNameInput = titleRenameForm.elements.namedItem('newName') as HTMLInputElement;
+            const newPosterInput = titleRenameForm.elements.namedItem('newPoster') as HTMLInputElement;
             const fillTitleEditFields = (titleName) => {
                 const targetSeries = appState.allSeries.find((series) => series.name === titleName);
                 if (!targetSeries)
                     return;
                 newNameInput.value = targetSeries.name;
                 newPosterInput.value = targetSeries.poster;
-                titleRenameForm.querySelectorAll('input[name="newTags"]').forEach((checkbox) => {
+                titleRenameForm.querySelectorAll<HTMLInputElement>('input[name="newTags"]').forEach((checkbox) => {
                     checkbox.checked = targetSeries.tags.has(checkbox.value);
                 });
                 bindMultiSelectSummary(titleRenameForm);
@@ -835,7 +836,7 @@ function renderAdminPanel(container) {
             fillTitleEditFields(titleSelect.value);
             titleRenameForm.onsubmit = async (event) => {
                 event.preventDefault();
-                const formData = new FormData(event.target);
+                const formData = new FormData(event.currentTarget as HTMLFormElement);
                 const oldName = String(formData.get('name') || '').trim();
                 const newName = String(formData.get('newName') || '').trim();
                 const newPoster = String(formData.get('newPoster') || '').trim();
@@ -858,11 +859,11 @@ function renderAdminPanel(container) {
                 }
             };
         }
-        const titleDeleteForm = document.getElementById('title-delete-form');
+        const titleDeleteForm = document.getElementById('title-delete-form') as HTMLFormElement | null;
         if (titleDeleteForm) {
             titleDeleteForm.onsubmit = async (event) => {
                 event.preventDefault();
-                const formData = new FormData(event.target);
+                const formData = new FormData(event.currentTarget as HTMLFormElement);
                 const oldName = String(formData.get('name') || '').trim();
                 if (!oldName)
                     return;
@@ -945,18 +946,18 @@ function renderAdminPanel(container) {
       </section>
     </section>
   `;
-    document.querySelectorAll('[data-episode-action]').forEach((btn) => {
+    document.querySelectorAll<HTMLElement>('[data-episode-action]').forEach((btn) => {
         btn.onclick = () => {
             appState.activeEpisodeAction = btn.dataset.episodeAction;
             render();
         };
     });
     bindMultiSelectSummary(container);
-    const episodeCreateForm = document.getElementById('episode-create-form');
+    const episodeCreateForm = document.getElementById('episode-create-form') as HTMLFormElement | null;
     if (episodeCreateForm) {
         episodeCreateForm.onsubmit = async (event) => {
             event.preventDefault();
-            const formData = new FormData(event.target);
+            const formData = new FormData(event.currentTarget as HTMLFormElement);
             const payload = {
                 titleName: String(formData.get('titleName') || '').trim(),
                 episodeNo: Number(formData.get('episodeNo')),
@@ -976,10 +977,10 @@ function renderAdminPanel(container) {
             }
         };
     }
-    const episodeBatchForm = document.getElementById('episode-batch-form');
+    const episodeBatchForm = document.getElementById('episode-batch-form') as HTMLFormElement | null;
     if (episodeBatchForm) {
-        const tagsErrorNode = episodeBatchForm.querySelector('#episode-batch-tags-error');
-        episodeBatchForm.querySelectorAll('input[name="batchTags"]').forEach((checkbox) => {
+        const tagsErrorNode = episodeBatchForm.querySelector('#episode-batch-tags-error') as HTMLElement | null;
+        episodeBatchForm.querySelectorAll<HTMLInputElement>('input[name="batchTags"]').forEach((checkbox) => {
             checkbox.onchange = () => {
                 validateTagSelection(episodeBatchForm, 'batchTags', tagsErrorNode, '请至少选择一个标签');
             };
@@ -988,7 +989,7 @@ function renderAdminPanel(container) {
             event.preventDefault();
             if (!validateTagSelection(episodeBatchForm, 'batchTags', tagsErrorNode, '请至少选择一个标签'))
                 return;
-            const formData = new FormData(event.target);
+            const formData = new FormData(event.currentTarget as HTMLFormElement);
             const payload = {
                 name: String(formData.get('name') || '').trim(),
                 poster: String(formData.get('poster') || '').trim(),
@@ -1012,12 +1013,12 @@ function renderAdminPanel(container) {
             }
         };
     }
-    const episodeUpdateForm = document.getElementById('episode-update-form');
+    const episodeUpdateForm = document.getElementById('episode-update-form') as HTMLFormElement | null;
     if (episodeUpdateForm) {
-        const titleSelect = episodeUpdateForm.elements.namedItem('titleName');
-        const episodeSelect = episodeUpdateForm.elements.namedItem('episodeNo');
-        const newEpisodeInput = episodeUpdateForm.elements.namedItem('newEpisodeNo');
-        const videoUrlInput = episodeUpdateForm.elements.namedItem('videoUrl');
+        const titleSelect = episodeUpdateForm.elements.namedItem('titleName') as HTMLSelectElement;
+        const episodeSelect = episodeUpdateForm.elements.namedItem('episodeNo') as HTMLSelectElement;
+        const newEpisodeInput = episodeUpdateForm.elements.namedItem('newEpisodeNo') as HTMLInputElement;
+        const videoUrlInput = episodeUpdateForm.elements.namedItem('videoUrl') as HTMLInputElement;
         const syncEpisodeEditFields = () => {
             const episodes = getEpisodeOptionsByTitle(titleSelect.value);
             const selectedEpisodeNo = Number(episodeSelect.value);
@@ -1039,7 +1040,7 @@ function renderAdminPanel(container) {
         syncEpisodeOptions();
         episodeUpdateForm.onsubmit = async (event) => {
             event.preventDefault();
-            const formData = new FormData(event.target);
+            const formData = new FormData(event.currentTarget as HTMLFormElement);
             const payload = {
                 titleName: String(formData.get('titleName') || '').trim(),
                 episodeNo: Number(formData.get('episodeNo')),
@@ -1059,10 +1060,10 @@ function renderAdminPanel(container) {
             }
         };
     }
-    const episodeDeleteForm = document.getElementById('episode-delete-form');
+    const episodeDeleteForm = document.getElementById('episode-delete-form') as HTMLFormElement | null;
     if (episodeDeleteForm) {
-        const titleSelect = episodeDeleteForm.elements.namedItem('titleName');
-        const episodeSelect = episodeDeleteForm.elements.namedItem('episodeNo');
+        const titleSelect = episodeDeleteForm.elements.namedItem('titleName') as HTMLSelectElement;
+        const episodeSelect = episodeDeleteForm.elements.namedItem('episodeNo') as HTMLSelectElement;
         const syncEpisodeOptions = () => {
             fillEpisodeSelectByTitle(titleSelect, episodeSelect, '选择集号');
         };
@@ -1070,7 +1071,7 @@ function renderAdminPanel(container) {
         syncEpisodeOptions();
         episodeDeleteForm.onsubmit = async (event) => {
             event.preventDefault();
-            const formData = new FormData(event.target);
+            const formData = new FormData(event.currentTarget as HTMLFormElement);
             const payload = {
                 titleName: String(formData.get('titleName') || '').trim(),
                 episodeNo: Number(formData.get('episodeNo'))
