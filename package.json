@@ -1,0 +1,16 @@
+{
+  "name": "xyy-video-preview-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lightweight video preview site with a native Node.js HTTP server and PostgreSQL.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}
