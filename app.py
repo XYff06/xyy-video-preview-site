@@ -6,7 +6,7 @@ from urllib.parse import urlparse, unquote
 import psycopg2
 import psycopg2.extras
 import requests
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, Response, jsonify, request, send_from_directory
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -258,7 +258,7 @@ def assign_title_tags(cur, title_id, tags):
     )
 
 
-app = Flask(__name__, static_folder='.', static_url_path='')
+app = Flask(__name__, static_folder=None)
 
 
 @app.get('/api/health')
@@ -428,7 +428,10 @@ def episodes_batch_directory():
     if parsed.scheme not in ('http', 'https'):
         return jsonify({'message': 'directoryUrl 只支持 http/https'}), 400
 
-    resp = requests.get(directory_url, timeout=10)
+    try:
+        resp = requests.get(directory_url, timeout=10)
+    except requests.RequestException as e:
+        return jsonify({'message': f'读取目录失败：{e.__class__.__name__}'}), 400
     if resp.status_code >= 400:
         return jsonify({'message': f'读取目录失败：HTTP {resp.status_code}'}), 400
     if 'html' not in (resp.headers.get('content-type') or '').lower():
@@ -587,6 +590,9 @@ def index_page():
 
 @app.get('/<path:path_name>')
 def static_files(path_name):
+    if path_name == 'app.ts':
+        with open(os.path.join(ROOT_DIR, path_name), 'r', encoding='utf-8') as f:
+            return Response(f.read(), mimetype='text/javascript; charset=utf-8')
     target = os.path.join(ROOT_DIR, path_name)
     if os.path.isfile(target):
         return send_from_directory(ROOT_DIR, path_name)
